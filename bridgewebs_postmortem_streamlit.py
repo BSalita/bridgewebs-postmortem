@@ -38,7 +38,7 @@ from mlBridgeLib.mlBridgePostmortemLib import PostmortemBase
 from mlBridgeLib.mlBridgeAugmentLib import (
     AllAugmentations,
 )
-from mlBridgeLib.mlBridgeWebLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
+from mlBridgeWebsLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
 import re
 
 
@@ -115,142 +115,181 @@ def prepare_for_player_selection(results):
 
 def section_selection_on_change():
     """Callback for when a user selects a new section."""
-    selected_section_key = st.session_state.get('selected_section_key')
-    if not selected_section_key:
-        return
+    try:
+        selected_section_key = st.session_state.get('selected_section_key')
+        if not selected_section_key:
+            return
 
-    # Clear old player-specific and processed data
-    st.session_state.player_names = None
-    if 'selected_player_key' in st.session_state:
-        st.session_state.selected_player_key = None
-    st.session_state.df = None
-    st.session_state.df_unfiltered = None
-    
-    results = st.session_state.all_results[selected_section_key]
-    prepare_for_player_selection(results)
+        # Clear old player-specific and processed data
+        st.session_state.player_names = None
+        if 'selected_player_key' in st.session_state:
+            st.session_state.selected_player_key = None
+        st.session_state.df = None
+        st.session_state.df_unfiltered = None
+        
+        results = st.session_state.all_results[selected_section_key]
+        prepare_for_player_selection(results)
+        
+    except Exception as e:
+        with st.session_state.main_section_container.container():
+            st.error(f"Error processing section selection: {str(e)}")
+            st.text("Please try selecting a different section.")
 
 
 def player_selection_on_change():
-    selected_player = st.session_state.get('selected_player_key')
-    if not selected_player:
-        return
+    try:
+        selected_player = st.session_state.get('selected_player_key')
+        if not selected_player:
+            return
 
-    # --- DEFERRED HEAVY PROCESSING ---
-    if 'df_unfiltered' not in st.session_state or st.session_state.df_unfiltered is None:
-        with st.spinner('Downloading and processing deal data... This may take a moment.'):
-            url = st.session_state.game_results_url
-            parser_df = st.session_state.parser_df
+        # --- DEFERRED HEAVY PROCESSING ---
+        if 'df_unfiltered' not in st.session_state or st.session_state.df_unfiltered is None:
+            with st.spinner('Downloading and processing deal data... This may take a moment.'):
+                url = st.session_state.game_results_url
+                parser_df = st.session_state.parser_df
 
-            file_content = read_pbn_file_from_url(url)
-            boards = pbn.loads(file_content)
-            print(f"Parsed {len(boards)} boards from PBN file")
-            
-            path_url = pathlib.Path(url)
-            df = merge_parsed_and_pbn_dfs(path_url, boards, parser_df)
-            
-            augmenter = AllAugmentations(df, None, sd_productions=st.session_state.single_dummy_sample_count, progress=st.progress(0), lock_func=perform_hand_augmentations_queue)
-            df, _ = augmenter.perform_all_augmentations()
+                file_content = read_pbn_file_from_url(url)
+                boards = pbn.loads(file_content)
+                print(f"Parsed {len(boards)} boards from PBN file")
                 
-            assert df.select(pl.col(pl.Object)).is_empty(), f"Found Object columns: {[col for col, dtype in df.schema.items() if dtype == pl.Object]}"
-            
-            st.session_state.df_unfiltered = df
-            st.session_state.session_id = parser_df[2]['results_session'].item()
-            st.session_state.group_id = parser_df[2]['club'].item()
-            st.session_state.con.register(st.session_state.con_register_name, df)
+                path_url = pathlib.Path(url)
+                df = merge_parsed_and_pbn_dfs(path_url, boards, parser_df)
+                
+                augmenter = AllAugmentations(df, None, sd_productions=st.session_state.single_dummy_sample_count, progress=st.progress(0), lock_func=perform_hand_augmentations_queue)
+                df, _ = augmenter.perform_all_augmentations()
+                    
+                assert df.select(pl.col(pl.Object)).is_empty(), f"Found Object columns: {[col for col, dtype in df.schema.items() if dtype == pl.Object]}"
+                
+                st.session_state.df_unfiltered = df
+                st.session_state.session_id = parser_df[2]['results_session'].item()
+                st.session_state.group_id = parser_df[2]['club'].item()
+                st.session_state.con.register(st.session_state.con_register_name, df)
 
-    # --- END OF DEFERRED PROCESSING ---
-    
-    all_pairs = st.session_state.combined_ns_ew_pairs
-    pair_row_df = all_pairs.filter(
-        pl.col('players').str.split('&').list.eval(pl.element().str.strip_chars()).list.contains(selected_player)
-    ).head(1)
+        # --- END OF DEFERRED PROCESSING ---
+        
+        all_pairs = st.session_state.combined_ns_ew_pairs
+        pair_row_df = all_pairs.filter(
+            pl.col('players').str.split('&').list.eval(pl.element().str.strip_chars()).list.contains(selected_player)
+        ).head(1)
 
-    if pair_row_df.is_empty():
+        if pair_row_df.is_empty():
+            with st.session_state.main_section_container.container():
+                st.error(f"Could not find pair for player: {selected_player}")
+            return
+
+        pair_row = pair_row_df.row(0, named=True)
+
+        st.session_state.player_name = selected_player
+        st.session_state.player_id = selected_player
+        
+        players_list = [p.strip() for p in pair_row['players'].split('&')]
+        partner_index = 1 - players_list.index(selected_player)
+        st.session_state.partner_name = players_list[partner_index]
+        st.session_state.partner_id = st.session_state.partner_name
+
+        st.session_state.pair_direction = 'NS' if pair_row['direction'].startswith('N') else 'EW'
+        st.session_state.pair_id = pair_row['pair_number']
+
+        if players_list.index(selected_player) == 0:
+            st.session_state.player_direction = st.session_state.pair_direction[0]
+            st.session_state.partner_direction = st.session_state.pair_direction[1]
+        else:
+            st.session_state.player_direction = st.session_state.pair_direction[1]
+            st.session_state.partner_direction = st.session_state.pair_direction[0]
+
+        st.session_state.opponent_pair_direction = 'EW' if st.session_state.pair_direction == 'NS' else 'NS'
+
+        df_filtered = filter_dataframe(
+            st.session_state.df_unfiltered,
+            st.session_state.pair_direction,
+            st.session_state.pair_id,
+            st.session_state.player_direction,
+            st.session_state.player_id,
+            st.session_state.partner_direction,
+            st.session_state.partner_id
+        )
+        
+        st.session_state.df = df_filtered
+        # Re-register the filtered dataframe for querying
+        st.session_state.con.register(st.session_state.con_register_name, st.session_state.df)
+
+        # Set ScorePercent based on pair direction
+        score_col = f"ScorePercent_{st.session_state.pair_direction}"
+        if score_col in df_filtered.columns:
+            st.session_state.ScorePercent = df_filtered.select(pl.col(score_col).first()).item()
+        else:
+            st.session_state.ScorePercent = None
+
+        read_configs()
+        
+    except Exception as e:
         with st.session_state.main_section_container.container():
-            st.error(f"Could not find pair for player: {selected_player}")
-        return
-
-    pair_row = pair_row_df.row(0, named=True)
-
-    st.session_state.player_name = selected_player
-    st.session_state.player_id = selected_player
-    
-    players_list = [p.strip() for p in pair_row['players'].split('&')]
-    partner_index = 1 - players_list.index(selected_player)
-    st.session_state.partner_name = players_list[partner_index]
-    st.session_state.partner_id = st.session_state.partner_name
-
-    st.session_state.pair_direction = 'NS' if pair_row['direction'].startswith('N') else 'EW'
-    st.session_state.pair_id = pair_row['pair_number']
-
-    if players_list.index(selected_player) == 0:
-        st.session_state.player_direction = st.session_state.pair_direction[0]
-        st.session_state.partner_direction = st.session_state.pair_direction[1]
-    else:
-        st.session_state.player_direction = st.session_state.pair_direction[1]
-        st.session_state.partner_direction = st.session_state.pair_direction[0]
-
-    st.session_state.opponent_pair_direction = 'EW' if st.session_state.pair_direction == 'NS' else 'NS'
-
-    df_filtered = filter_dataframe(
-        st.session_state.df_unfiltered,
-        st.session_state.pair_direction,
-        st.session_state.pair_id,
-        st.session_state.player_direction,
-        st.session_state.player_id,
-        st.session_state.partner_direction,
-        st.session_state.partner_id
-    )
-    
-    st.session_state.df = df_filtered
-    # Re-register the filtered dataframe for querying
-    st.session_state.con.register(st.session_state.con_register_name, st.session_state.df)
-
-    score_col_ns = f"ScorePercent_NS"
-    score_col_ew = f"ScorePercent_EW"
-    if score_col_ns in df_filtered.columns and score_col_ew in df_filtered.columns:
-        st.session_state.ScorePercent_NS = df_filtered.select(pl.col(score_col_ns).first()).item()
-        st.session_state.ScorePercent_EW = df_filtered.select(pl.col(score_col_ew).first()).item()
-    
-    read_configs()
+            st.error(f"Error processing player selection: {str(e)}")
+            st.text(f"Player: {st.session_state.get('selected_player_key', 'Unknown')}")
+            st.text("Please try selecting a different player.")
+            # Clear the problematic player selection
+            if 'selected_player_key' in st.session_state:
+                st.session_state.selected_player_key = None
 
 
 def change_game_state():
 
     st.session_state.main_section_container.empty()
-    with st.spinner(f'Preparing Bridge Game Postmortem Report...'):
-        reset_game_data() # wipe out all game state data
+    
+    try:
+        with st.spinner(f'Preparing Bridge Game Postmortem Report...'):
+            reset_game_data() # wipe out all game state data
 
-        url = st.session_state.create_sidebar_text_input_url_key.strip()
-        url = html.unescape(url)
-        st.session_state.game_results_url = url
-        st.text(f"Selected URL: {url}")
-
-        if url is None or url == '' or (get_url_protocol(url) == 'file' and ('/' in url and '\\' in url and '&' in url)):
-            return
-
-        parser = BridgeWebResultsParser(url)
-        all_results = parser.get_all_results()
-        st.session_state.all_results = all_results
-
-        if not all_results:
+            url = st.session_state.create_sidebar_text_input_url_key.strip()
+            url = html.unescape(url)
+            st.session_state.game_results_url = url
             with st.session_state.main_section_container.container():
-                st.error(f"Could not parse any results from the URL: {url}")
-            return
+                st.text(f"Selected URL: {url}")
 
-        # If multiple sections are found, prompt user to select one first.
-        if len(all_results) > 1:
-            st.session_state.section_names = list(all_results.keys())
-            # Clear player names to ensure player selector is not shown
-            st.session_state.player_names = None
-            if 'selected_player_key' in st.session_state:
-                st.session_state.selected_player_key = None
-            return
-        else:
-            # Otherwise, process the single section to get player names.
-            first_section_key = next(iter(all_results))
-            results = all_results[first_section_key]
-            prepare_for_player_selection(results)
+            if url is None or url == '' or (get_url_protocol(url) == 'file' and ('/' in url and '\\' in url and '&' in url)):
+                with st.session_state.main_section_container.container():
+                    st.warning("Please enter a valid BridgeWebs URL.")
+                return
+
+            parser = BridgeWebResultsParser(url)
+            all_results = parser.get_all_results()
+            st.session_state.all_results = all_results
+
+            if not all_results:
+                with st.session_state.main_section_container.container():
+                    st.error(f"Could not parse any results from the URL: {url}")
+                return
+
+            # If multiple sections are found, prompt user to select one first.
+            if len(all_results) > 1:
+                st.session_state.section_names = list(all_results.keys())
+                # Clear player names to ensure player selector is not shown
+                st.session_state.player_names = None
+                # Reset sidebar widget states
+                if 'selected_player_key' in st.session_state:
+                    st.session_state.selected_player_key = None
+                if 'selected_section_key' in st.session_state:
+                    st.session_state.selected_section_key = None
+                return
+            else:
+                # Otherwise, process the single section to get player names.
+                first_section_key = next(iter(all_results))
+                results = all_results[first_section_key]
+                prepare_for_player_selection(results)
+                # Reset sidebar widget states for single section
+                if 'selected_player_key' in st.session_state:
+                    st.session_state.selected_player_key = None
+                    
+    except Exception as e:
+        # Catch any unexpected errors and display them
+        with st.session_state.main_section_container.container():
+            st.error(f"An error occurred while processing the URL: {str(e)}")
+            st.text(f"URL: {st.session_state.get('game_results_url', 'Unknown')}")
+            st.text("Please try again or use a different URL.")
+            # Log the full error for debugging
+            import traceback
+            st.text("Full error details:")
+            st.code(traceback.format_exc())
     return
 
 
@@ -320,8 +359,9 @@ def create_sidebar():
 
     if 'tournament_info' in st.session_state and not st.session_state.tournament_info.is_empty():
         club = st.session_state.tournament_info['club'].item() if 'club' in st.session_state.tournament_info.columns else "N/A"
-        event_title = st.session_state.tournament_info['title'].item() if 'title' in st.session_state.tournament_info.columns else "N/A"
-        st.sidebar.info(f"**Club:** {club}\n\n**Event:** {event_title}")
+        # grab event_title from title (best) or event column (if title is missing).
+        st.session_state.event_title = st.session_state.tournament_info['title'].item() if 'title' in st.session_state.tournament_info.columns else st.session_state.tournament_info['event'].item() if 'event' in st.session_state.tournament_info.columns else "N/A"
+        st.sidebar.info(f"**Club:** {club}\n\n**Event:** {st.session_state.event_title}")
         if 'game_results_url' in st.session_state and st.session_state.game_results_url:
             st.sidebar.markdown(f"**[Results Page]({st.session_state.game_results_url})**")
 
@@ -417,7 +457,7 @@ def reset_game_data():
 
     # Default values for session state variables
     reset_defaults = {
-        'game_description_default': None,
+        'event_title_default': None,
         'group_id_default': None,
         'session_id_default': None,
         'section_name_default': None,
@@ -443,7 +483,7 @@ def reset_game_data():
     reset_session_vars = {
         'df': None,
         'df_unfiltered': None,
-        'game_description': st.session_state.game_description_default,
+        'event_title': st.session_state.event_title_default,
         'group_id': st.session_state.group_id_default,
         'session_id': st.session_state.session_id_default,
         'section_name': st.session_state.section_name_default,
@@ -466,11 +506,18 @@ def reset_game_data():
         'game_urls_d': {},
         'tournament_session_urls_d': {},
         'current_datetime': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        # Clear data that could affect display
+        'all_results': None,
+        'parser_df': None,
+        'tournament_info': None,
+        'combined_ns_ew_pairs': None,
+        'favorites': None,
+        'ScorePercent': None,
     }
     
+    # Actually reset the session state variables to clear previous game data
     for key, value in reset_session_vars.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+        st.session_state[key] = value
 
     return
 
@@ -616,6 +663,30 @@ class PBNResultsCalculator(PostmortemBase):
         # Call super method for standard elements
         create_sidebar() # accessing the global function, not the class method.
 
+    def create_ui(self):
+        """Creates the main UI structure with player selection prompts."""
+        self.create_sidebar()
+        if not st.session_state.sql_query_mode:
+            # Check if we should show player selection prompt
+            if (st.session_state.get('player_names') is not None and 
+                len(st.session_state.player_names) > 0 and 
+                st.session_state.get('selected_player_key') is None and
+                st.session_state.session_id is None):
+                
+                # Show Morty message prompting user to select a player
+                with st.session_state.main_section_container.container():
+                    import streamlit_chat
+                    streamlit_chat.message(
+                        "Please select the player name from Player for Postmortem selection box in the left sidebar. It will be used to generate a personalized postmortem report.",
+                        key='morty_select_player_prompt',
+                        logo=st.session_state.assistant_logo
+                    )
+            
+            # Show report if player is selected
+            if st.session_state.session_id is not None:
+                self.write_report()
+        self.ask_sql_query()
+
     def create_main_content(self):
         """Create app-specific main content."""
         # Implementation
@@ -659,13 +730,25 @@ class PBNResultsCalculator(PostmortemBase):
         # bar_format='{l_bar}{bar}' isn't working in stqdm. no way to suppress r_bar without editing stqdm source code.
         # todo: need to pass the Button title to the stqdm description. this is a hack until implemented.
         st.session_state.main_section_container = st.container(border=True)
+        
+        # Scroll to top of the page before rendering the report
+        st.markdown("""
+            <script>
+                setTimeout(function() {
+                    window.scrollTo({top: 0, behavior: 'smooth'});
+                }, 50);
+            </script>
+        """, unsafe_allow_html=True)
+        
         with st.session_state.main_section_container:
             report_title = f"Bridge Game Postmortem Report Personalized for {st.session_state.player_name}" # can't use (st.session_state.player_id) because of href link below.
             report_creator = f"Created by https://{st.session_state.game_name}.postmortem.chat"
-            report_event_info = f"{st.session_state.game_description} (event id {st.session_state.session_id})."
+            report_event_info = f"Session: {st.session_state.event_title} {'' if st.session_state.event_title == st.session_state.session_id else f'(event id {st.session_state.session_id})'}"
             report_game_results_webpage = f"Results Page: {st.session_state.game_results_url}"
-            report_your_match_info = f"Your pair was {st.session_state.pair_id}{st.session_state.pair_direction} in section {st.session_state.section_name}. You played {st.session_state.player_direction}. Your partner was {st.session_state.partner_name} ({st.session_state.partner_id}) who played {st.session_state.partner_direction}."
-            st.markdown(f"### {report_title}")
+            report_your_match_info = f"Your pair was {st.session_state.pair_id}{st.session_state.pair_direction} {'' if st.session_state.section_name is None else 'in section '+st.session_state.section_name}. You played {st.session_state.player_direction}. Your partner was {st.session_state.partner_name} {'' if st.session_state.partner_name == st.session_state.partner_id else '('+st.session_state.partner_id+')'} who played {st.session_state.partner_direction}. Your pair scored {st.session_state.ScorePercent}%"
+            # Create a dummy anchor well above the title so title appears at top when scrolling
+            st.markdown('<div style="height: 50px;"><a name="top-of-report"></a></div>', unsafe_allow_html=True)
+            st.markdown(f'<h3 id="report-title">{report_title}</h3>', unsafe_allow_html=True)
             st.markdown(f"##### {report_creator}")
             st.markdown(f"#### {report_event_info}")
             st.markdown(f"##### {report_game_results_webpage}")
@@ -697,14 +780,16 @@ class PBNResultsCalculator(PostmortemBase):
                             pdf_assets.append(query_df)
                         sql_query_count += 1
 
-            # As a text link
-            #st.markdown('[Back to Top](#your-personalized-report)')
-
-            # As an html button (needs styling added)
-            # can't use link_button() restarts page rendering. markdown() will correctly jump to href.
-            # st.link_button('Go to top of report',url='#your-personalized-report')\
-            report_title_anchor = report_title.replace(' ','-').lower()
-            st.markdown(f'<a target="_self" href="#{report_title_anchor}"><button>Go to top of report</button></a>', unsafe_allow_html=True)
+            # Go to top button using simple anchor link (centered)
+            st.markdown('''
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="#top-of-report" style="text-decoration: none;">
+                        <button style="padding: 8px 16px; background-color: #ff4b4b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                            Go to top of report
+                        </button>
+                    </a>
+                </div>
+            ''', unsafe_allow_html=True)
 
         if st.session_state.pdf_link.download_button(label="Download Personalized Report",
                 data=streamlitlib.create_pdf(st.session_state.pdf_assets, title=f"Bridge Game Postmortem Report Personalized for {st.session_state.player_id}"),

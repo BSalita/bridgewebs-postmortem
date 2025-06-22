@@ -34,48 +34,157 @@ def lin_files_to_boards_dict(lin_files_l,boards_d,bbo_lin_files_cache_file=None)
     return boards_d
 
 
-def endplay_boards_to_df(pbn_deal_d: dict[str, list]) -> pl.DataFrame:
-    """
-    Converts a dictionary of PBN deals into a Polars DataFrame, exploding the
-    score table for each board to create one row per result. This function is
-    designed to be robust against missing attributes in the parsed data.
-    """
-    all_rows = []
-    for source_file, boards in pbn_deal_d.items():
-        for board in boards:
-            # --- Base information for the board ---
-            base_info = {
-                "source_file": str(source_file),
-                "board_num": getattr(board, 'board_num', None),
-                "PBN": getattr(board, 'deal', None).to_pbn() if hasattr(board, 'deal') else None,
-                "vulnerability": str(getattr(board, '_vul', 'None')),
-                "dealer": getattr(getattr(board, 'dealer', None), 'abbr', None)
-            }
+def endplay_boards_to_df(boards_d): 
+    # Initialize data dictionary as defaultdict(list)
+    board_d = defaultdict(list)
 
-            # --- Score table contains the crucial per-pair results ---
-            if hasattr(board, "score_table") and board.score_table:
-                for score_row in board.score_table:
-                    row_data = base_info.copy()
-                    row_data.update({
-                        "PairId_NS": getattr(score_row, 'pair_ns', None),
-                        "PairId_EW": getattr(score_row, 'pair_ew', None),
-                        "Contract_str": getattr(score_row, 'contract', None),
-                        "Declarer_str": getattr(score_row, 'declarer', None),
-                        "Result_str": getattr(score_row, 'result', None),
-                        "Score_str": getattr(score_row, 'score', None),
-                    })
-                    all_rows.append(row_data)
-            else:
-                # If no score_table, we still need a row for the deal itself,
-                # but pair/result info will be missing.
-                all_rows.append(base_info)
-    
-    if not all_rows:
-        return pl.DataFrame()
+    # There's always only one board per lin file.(?). You can have multiple boards by simply concatenating lin files with '\n' in between them.
+    for nfiles,(lin_file,boards_in_lin_file) in enumerate(boards_d.items()):
+        if nfiles % 10000 == 0:
+            print(f'{nfiles}/{len(boards_d)}/{len(boards_in_lin_file)} file:{lin_file}')
+        #if nfiles == 100000:
+        #    break
+        for i,b in enumerate(boards_in_lin_file):
+            board_d['board_num'].append(b.board_num)
+            board_d['dealer'].append(b.dealer.abbr) # None if passed out
+            board_d['vulnerability'].append(b._vul) # None if passed out, weird
+            board_d['passout'].append(b._contract.is_passout() if b._contract else None)
+            board_d['contract'].append(str(b._contract) if b._contract else None)
+            board_d['level'].append(b._contract.level if b._contract else None)
+            board_d['denom'].append(b._contract.denom.name if b._contract else None)
+            board_d['trump'].append(b.deal.trump.name)
+            board_d['penalty'].append(b._contract.penalty.name if b._contract else None)
+            board_d['declarer'].append(b._contract.declarer.name if b._contract else None)
+            board_d['result'].append(b._contract.result if b._contract else None)
+            board_d['score'].append(b._contract.score(b._vul) if b._contract else None)
+            board_d['claimed'].append(b.claimed)
+            board_d['PBN'].append(str(b.deal.to_pbn())) #.to_pbn())
+            board_d['Hand_N'].append(str(b.deal.north)) # str()
+            board_d['Hand_E'].append(str(b.deal.east)) # str()
+            board_d['Hand_S'].append(str(b.deal.south)) # str()
+            board_d['Hand_W'].append(str(b.deal.west)) # str()
+            board_d['info'].append(b.info)
+            board_d['source_file'].append(str(lin_file)) # todo: change key to be str instead of pathlib.Path?
+            bid_type = []
+            denom = []
+            penalty = []
+            level = []
+            alertable = []
+            announcement = []
 
-    # Create the DataFrame from the list of dictionaries.
-    # Polars will handle schema inference.
-    return pl.DataFrame(all_rows)
+            for bid in b.auction:
+                if hasattr(bid, 'denom'):
+                    bid_type.append('Contract')
+                    denom.append(bid.denom.name)
+                    penalty.append(None)
+                    level.append(bid.level)
+                    alertable.append(bid.alertable)
+                    announcement.append(bid.announcement)
+                else:
+                    bid_type.append('Penalty')
+                    denom.append(None)
+                    penalty.append(bid.penalty.name)
+                    level.append(None)
+                    alertable.append(bid.alertable)
+                    announcement.append(bid.announcement)
+            board_d['bid_type'].append(bid_type)
+            board_d['bid_denom'].append(denom)
+            board_d['bid_penalty'].append(penalty)
+            board_d['bid_level'].append(level)
+            board_d['bid_alertable'].append(alertable)
+            board_d['bid_announcement'].append(announcement)
+            play_rank = []
+            play_suit = []
+            for play in b.play:
+                play_rank.append(play.rank.name)
+                play_suit.append(play.suit.name)
+            board_d['play_rank'].append(play_rank)
+            board_d['play_suit'].append(play_suit)
+
+    # schema definitions for pl.DataFrame()
+    schema = {
+        'board_num':pl.UInt16,
+        'dealer':pl.Utf8,
+        'vulnerability':pl.Utf8,
+        'passout':pl.Boolean,
+        'contract':pl.Utf8, # drop_na later
+        'level':pl.UInt8,
+        'denom':pl.Utf8,
+        'trump':pl.Utf8,
+        'penalty':pl.Utf8,
+        'declarer':pl.Utf8,
+        'result':pl.Int8,
+        'score':pl.Int16,
+        'claimed':pl.Boolean,
+        'PBN':pl.Utf8, # str later
+        'Hand_N':pl.Utf8, # str later
+        'Hand_E':pl.Utf8, # str later
+        'Hand_S':pl.Utf8, # str later
+        'Hand_W':pl.Utf8, # str later
+        'info':pl.Struct, # unnest later
+        'source_file':pl.Utf8,
+        'bid_type':pl.List(pl.Utf8),
+        'bid_denom':pl.List(pl.Utf8),
+        'bid_penalty':pl.List(pl.Utf8),
+        'bid_level':pl.List(pl.UInt8),
+        'bid_alertable':pl.List(pl.Boolean),
+        'bid_announcement':pl.List(pl.Utf8), # strip later
+        'play_rank':pl.List(pl.Utf8),
+        'play_suit':pl.List(pl.Utf8),
+    }
+    assert set(board_d.keys()) == set(schema.keys()), set(board_d.keys()).symmetric_difference(set(schema.keys()))
+
+    # TypeError: unexpected value while building Series of type String; found value of type Struct([Field { name: "ordering", dtype: Null }, Field { name: "name", dtype: String }, Field { name: "minwidth", dtype: String }, Field { name: "alignment", dtype: String }]): {null,"Denomination","2","R"}
+    df = pl.DataFrame(board_d,strict=False) # ,schema=schema # todo: complains about Player if strict=True. haven't been able to isolate why.
+
+    # Struct columns need to be unnested.
+    if 'info' in df.columns:
+        df = df.unnest('info') # if derived from lin files: unnest 'info' (Struct(5)) into Player_[NESW] columns.
+        if 'ScoreTable' in df.columns:
+            st_dfs = []
+            for i,b in enumerate(boards_in_lin_file):
+                st_df = pl.DataFrame(b.info.ScoreTable['rows'],schema=[h['name'] for h in b.info.ScoreTable['headers']],orient="row")
+                st_df = st_df.with_columns(pl.lit(b.board_num).alias('board_num'))
+                st_df = st_df.select(['board_num'] + [col for col in st_df.columns if col != 'board_num'])
+                st_dfs.append(st_df)
+            st_df = pl.concat(st_dfs)
+            # Explode the main DataFrame by joining with ScoreTable data
+            df = df.join(st_df, on='board_num', how='inner')
+            # todo: use exploded columns ['Contract', 'Declarer', 'Result'] to replace 'denom', 'penalty', 'trump', 'contract', 'level', 'bid_denom', 'bid_penalty', 'bid_trump', 'bid_contract', 'bid_level'
+
+    # rename columns. some derive from lin->endplay, others from pbn->endplay
+    # todo: after renaming, cast to preferred type.
+    custom_naming_exceptions = {
+        'BCFlags':'BCFlags',
+        'Date':'Date',
+        'Event':'Event',
+        'Room':'Room',
+        'Score':'Score',
+        'Scoring':'Scoring',
+        'Site':'Site',
+        'North':'Player_N', # pl.String
+        'East':'Player_E', # pl.String
+        'South':'Player_S', # pl.String
+        'West':'Player_W' # pl.String
+    }
+    df = df.rename(custom_naming_exceptions)
+
+    # obsolete? isn't needed for lin but might be needed for pbn.
+    # if i == 0: # first board
+    #     custom_c_l = set(b.info.keys()).difference(boards_d.keys())
+    #     #print(f'Creating columns for custom info keys: {custom_c_l}')
+    # else: # subsequent boards must match first board's info keys
+    #     custom_c_diffs = set(b.info.keys()).symmetric_difference(custom_c_l)
+    #     assert custom_c_diffs == set(), custom_c_diffs
+    # for c in custom_c_l:
+    #     board_d[custom_naming_exceptions.get(c,'Custom_'+c)].append(b.info[c])
+
+    # probably need to filter out rows. possibly bad practice to filter here because it changes row count?
+    # filter out pbn of N:... ... ... ... and contract of null.
+    # df = df.filter(pl.col('PBN').ne('N:... ... ... ...'))
+    # df = df.filter(pl.col('contract').is_not_null())
+
+    return df
 
 
 # convert lin file columns to conform to bidding table columns.
@@ -185,65 +294,217 @@ Dbl_to_X_d = {
 
 
 def convert_endplay_df_to_mlBridge_df(df):
-    """
-    This function takes a DataFrame created from endplay objects and standardizes
-    it for use in the mlBridge library, including type casting and column renaming.
-    """
-    # Create a copy to avoid modifying the original DataFrame in place
-    df = df.clone()
-    
-    # Ensure all required columns exist, adding them with null values if not
-    required_cols = {
-        'PairId_NS': pl.Utf8, 'PairId_EW': pl.Utf8, 'Player_Name_N': pl.Utf8,
-        'Player_Name_S': pl.Utf8, 'Player_Name_E': pl.Utf8, 'Player_Name_W': pl.Utf8,
-        'Contract_str': pl.Utf8, 'Declarer_str': pl.Utf8, 'Result_str': pl.Int64,
-        'Score_str': pl.Int64
-    }
-    for col, dtype in required_cols.items():
-        if col not in df.columns:
-            df = df.with_columns(pl.lit(None, dtype=dtype).alias(col))
-            
-    # Normalize contract string and parse it
+
+    # with_columns() is separated for easier debugging. iVul has to be separated anyways.
+    # todo: create Date column using date embedded in source file name.
+    # todo: is pair number ns, pair number ew needed?
+    # todo: make relevant columns categorical.
+
+    if 'index' not in df.columns:
+        df = df.with_row_index() # useful for keeping track of rows.
+
     df = df.with_columns(
-        pl.col('Contract_str').str.replace_all(r'[^0-9A-Z]', '').alias('Contract_norm')
+        pl.Series('Board',df['board_num'],pl.UInt8),
     )
-    
-    df = df.with_columns([
-        pl.col('Contract_norm').str.slice(0, 1).cast(pl.UInt8, strict=False).alias('level'),
-        pl.col('Contract_norm').str.slice(1, 2).alias('denom'),
-        pl.col('Contract_norm').str.slice(2).alias('penalty_str')
-    ])
-    
-    # Map penalty string to a standard format
     df = df.with_columns(
-        pl.when(pl.col('penalty_str') == 'X')
-        .then(pl.lit('DOUBLED'))
-        .when(pl.col('penalty_str') == 'XX')
-        .then(pl.lit('REDOUBLED'))
-        .otherwise(pl.lit('UNDOUBLED'))
-        .alias('penalty')
+        pl.Series('Dealer', [Direction_to_NESW_d[d] for d in df['dealer']], pl.String, strict=False), # todo: using list comprehension instead of type error when using replace_strict().
     )
-
-    # Standardize player and pair columns
-    df = df.with_columns([
-        pl.col('Player_Name_N').alias('Player_N'),
-        pl.col('Player_Name_S').alias('Player_S'),
-        pl.col('Player_Name_E').alias('Player_E'),
-        pl.col('Player_Name_W').alias('Player_W'),
-        pl.col('Result_str').alias('result'),
-        pl.col('Score_str').alias('score_int')
-    ])
-
-    # Final column selection to create a clean, standardized DataFrame
-    final_cols = [
-        'source_file', 'board_num', 'PBN', 'vulnerability', 'dealer', 
-        'PairId_NS', 'PairId_EW', 'Player_N', 'Player_S', 'Player_E', 'Player_W',
-        'level', 'denom', 'penalty', 'Declarer_str', 'result', 'score_int'
-    ]
-    
-    # Ensure all final columns exist in the DataFrame before selecting
-    for col in final_cols:
-        if col not in df.columns:
-            df = df.with_columns(pl.lit(None).alias(col))
-
-    return df.select(final_cols)
+    df = df.with_columns(
+        pl.Series('Vul', [Vulnerability_to_Vul_d[v] for v in df['vulnerability']], pl.String, strict=False), # todo: using list comprehension instead of type error when using replace_strict().
+    )
+    df = df.with_columns(
+        pl.Series('iVul',df['vulnerability'].cast(pl.UInt8),pl.UInt8), # assumes input is 0 or '0', etc.
+    )
+    df = df.with_columns(
+        pl.col('iVul').replace_strict(EpiVul_to_Vul_NS_Bool_d,return_dtype=pl.Boolean).alias('Vul_NS'),
+    )
+    df = df.with_columns(
+        pl.col('iVul').replace_strict(EpiVul_to_Vul_EW_Bool_d,return_dtype=pl.Boolean).alias('Vul_EW'),
+    )
+    # BridgeWeb uses ScoreTable.
+    if 'ScoreTable' in df.columns:
+        df = df.with_columns(
+           pl.col('Contract').str.replace('NT','N').str.extract(r"^([^-+]*)", 1),
+        )
+        df = df.with_columns(
+            pl.Series('Dbl',df['Contract'].str.slice(2),pl.String), # categorical, yes
+        )
+        df = df.with_columns(
+            pl.col('Contract').str.slice(0,1).cast(pl.UInt8, strict=False).alias('BidLvl'), # Extract first character (bid level)
+        )
+        df = df.with_columns(
+            pl.col('Contract').str.slice(1,1).alias('BidSuit'), # Extract second character (suit) from contract (categorical, yes)
+        )
+        df = df.with_columns(
+            # easier to use discrete replaces instead of having to slice contract (nt, pass would be a complication)
+            # first NT->N and suit symbols to SHDCN
+            # If BidLvl is None, make Contract None
+            pl.when(pl.col('BidLvl').is_null())
+            .then(None)
+            .otherwise(pl.col('BidLvl').cast(pl.String)+pl.col('BidSuit')+pl.col('Declarer')+pl.col('Dbl'))
+            .alias('Contract'),
+        )
+        df = df.with_columns(
+            pl.Series('trump',df['trump'].replace_strict(Strain_to_CDHSN_d,return_dtype=pl.String),pl.String),# categorical?
+        )
+        df = df.with_columns(
+            pl.Series('Declarer_Direction', [Direction_to_NESW_d[d] for d in df['Declarer']], pl.String, strict=False), # todo: using list comprehension instead of type error when using replace_strict().
+        )
+        df = df.with_columns(
+            pl.Series('Tricks',df['Result'].cast(pl.UInt8, strict=False).fill_nan(0),pl.UInt8),
+        )
+        # example of creating unneeded column. could drop here and leave it to mlBridgeAugmentLib to recreate with proper values.
+        df = df.with_columns(
+            pl.Series('Result',df['Tricks'].cast(pl.Int8, strict=False)-6-df['BidLvl']), # overwrites Result column.
+        )
+        # leave it to mlBridgeAugmentLib to convert contract parts to Score and Score_NS.
+        # df = df.with_columns(
+        #     pl.Series('Score',df['score'].cast(pl.Int16, strict=False).fill_nan(0),pl.Int16),
+        # )
+        df = df.with_columns(
+            pl.col('PairId_NS').cast(pl.Utf8).alias('Pair_Number_NS'), # todo: fake Pair_Number_NS
+        )
+        df = df.with_columns(
+            pl.col('PairId_EW').cast(pl.Utf8).alias('Pair_Number_EW'), # todo: fake Pair_Number_EW
+        )
+        df = df.with_columns(
+            pl.Series('Player_ID_N',df['Pair_Number_NS']+'_N',pl.String), # todo: fake player id
+        )
+        df = df.with_columns(
+            pl.Series('Player_ID_E',df['Pair_Number_EW']+'_E',pl.String), # todo: fake player id
+        )
+        df = df.with_columns(
+            pl.Series('Player_ID_S',df['Pair_Number_NS']+'_S',pl.String), # todo: fake player id
+        )
+        df = df.with_columns(
+            pl.Series('Player_ID_W',df['Pair_Number_EW']+'_W',pl.String), # todo: fake player id
+        )
+        # todo: rename ScorePercent_NS to MP_Pct_NS?
+        # df = df.with_columns(
+        #     pl.Series('?',df['ScorePercent_NS'],pl.Float64),
+        # )
+        # df = df.with_columns(
+        #     pl.Series('?',df['ScorePercent_EW'],pl.Float64),
+        # )
+        # todo: rename MatchPoints_NS to ?
+        # df = df.with_columns(
+        #     pl.Series('?',df['MatchPoints_NS'],pl.Float64),
+        # )
+        # df = df.with_columns(
+        #     pl.Series('?',df['MatchPoints_EW'],pl.Float64),
+        # )
+    else:
+        #pl.Series('passout',df['passout'],pl.Boolean), # todo: make passout a boolean in previous step.
+        df = df.with_columns(
+            # easier to use discrete replaces instead of having to slice contract (nt, pass would be a complication)
+            # first NT->N and suit symbols to SHDCN
+            pl.Series('Contract',df['contract'],pl.String).str.replace('NT','N').str.replace('♠','S').str.replace('♥','H').str.replace('♦','D').str.replace('♣','C').str.extract(r"^([^-+]*)", 1),
+        )
+        df = df.with_columns(
+            pl.Series('BidLvl',df['level'].cast(pl.UInt8, strict=False),pl.UInt8), # todo: make level a uint8 in previous step.
+        )
+        df = df.with_columns(
+            pl.Series('BidSuit',df['denom'].replace_strict(Strain_to_CDHSN_d,return_dtype=pl.String),pl.String),# categorical, yes
+        )
+        df = df.with_columns(
+            pl.Series('trump',df['trump'].replace_strict(Strain_to_CDHSN_d,return_dtype=pl.String),pl.String),# categorical?
+        )
+        df = df.with_columns(
+            pl.Series('Dbl',df['penalty'].replace_strict(Dbl_to_X_d,return_dtype=pl.String),pl.String),# categorical, yes
+        )
+        df = df.with_columns(
+            pl.Series('Declarer_Direction', [Direction_to_NESW_d[d] for d in df['declarer']], pl.String, strict=False), # todo: using list comprehension instead of type error when using replace_strict().
+        )
+        df = df.with_columns(
+            pl.Series('Result',df['result'].cast(pl.Int8, strict=False).fill_nan(0),pl.Int8),
+        )
+        df = df.with_columns(
+            pl.Series('Tricks',df['level'].cast(pl.Int8, strict=False).fill_nan(0)+df['result'].cast(pl.Int8, strict=False).fill_nan(0)+6,pl.UInt8),
+        )
+        df = df.with_columns(
+            pl.Series('Score',df['score'].cast(pl.Int16, strict=False).fill_nan(0),pl.Int16),
+        )
+        df = df.with_columns(
+            pl.lit(0).cast(pl.UInt32).alias('Pair_Number_NS'), # todo: fake Pair_Number_NS
+        )
+        df = df.with_columns(
+            pl.lit(0).cast(pl.UInt32).alias('Pair_Number_EW'), # todo: fake Pair_Number_EW
+        )
+        df = df.with_columns(
+            pl.Series('Player_Name_N',df['Player_N'],pl.String),
+        )
+        df = df.with_columns(
+            pl.Series('Player_Name_E',df['Player_E'],pl.String),
+        )
+        df = df.with_columns(
+            pl.Series('Player_Name_S',df['Player_S'],pl.String),
+        )
+        df = df.with_columns(
+            pl.Series('Player_Name_W',df['Player_W'],pl.String),
+        )
+        df = df.with_columns(
+            pl.Series('Player_ID_N',df['Pair_Number_NS']+'_N',pl.String), # todo: fake player id
+        )
+        df = df.with_columns(
+            pl.Series('Player_ID_E',df['Pair_Number_EW']+'_E',pl.String), # todo: fake player id
+        )
+        df = df.with_columns(
+            pl.Series('Player_ID_S',df['Pair_Number_NS']+'_S',pl.String), # todo: fake player id
+        )
+        df = df.with_columns(
+            pl.Series('Player_ID_W',df['Pair_Number_EW']+'_W',pl.String), # todo: fake player id
+        )
+    df = df.with_columns(
+        df['claimed'].cast(pl.Boolean, strict=False),
+    )
+    df = df.with_columns(
+        pl.Series('source_file',df['source_file'],pl.String),
+    )
+    df = df.with_columns(
+        pl.Series('bid_type',df['bid_type'],pl.List(pl.String)), # categorical?
+    )
+    df = df.with_columns(
+        pl.Series('bid_denom',df['bid_denom'],pl.List(pl.String)), # categorical?
+    )
+    df = df.with_columns(
+        pl.Series('bid_penalty',df['bid_penalty'],pl.List(pl.String)), # categorical?
+    )
+    df = df.with_columns(
+        #pl.Series('bid_level',df['bid_level'].cast(pl.List(pl.Int64), strict=False)+1,pl.List(pl.Int64)), # todo: make bid_level a uint8 in previous step.
+    )
+    df = df.with_columns(
+        pl.Series('bid_alertable',df['bid_alertable'],pl.List(pl.Boolean)),
+    )
+    df = df.with_columns(
+        pl.Series('bid_announcement',df['bid_announcement'],pl.List(pl.String)),
+    )
+    df = df.with_columns(
+        pl.Series('play_rank',df['play_rank'],pl.List(pl.String)),# categorical?
+    )
+    df = df.with_columns(
+        pl.Series('play_suit',df['play_suit'],pl.List(pl.String)),# categorical?
+    )
+    # drop unused or obsolete columns
+    df = df.drop(
+        {
+            'board_num',
+            'dealer',
+            'vulnerability',
+            'contract',
+            'level',
+            'denom',
+            'penalty',
+            'declarer',
+            'result',
+            'score',
+            'Player_N',
+            'Player_E',
+            'Player_S',
+            'Player_W',
+            #'ScorePercent_NS',
+            #'MatchPoints_NS',
+            #'ScorePercent_EW',
+            #'MatchPoints_EW',
+        }
+    )
+    return df

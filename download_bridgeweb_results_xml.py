@@ -1,5 +1,5 @@
 import argparse
-from mlBridgeLib.mlBridgeWebLib import process_bridgewebs_url
+from mlBridgeWebsLib import process_bridgewebs_url
 import polars as pl
 import pprint
 
