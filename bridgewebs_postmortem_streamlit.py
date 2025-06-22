@@ -169,7 +169,8 @@ def player_selection_on_change():
         
         st.error("2")
         all_pairs = st.session_state.combined_ns_ew_pairs
-        st.error("3")
+        st.error(f"3: players in columns: {'players' in all_pairs.columns}")
+        st.dataframe(all_pairs['players'])
         pair_row_df = all_pairs.filter(
             pl.col('players').str.split('&').list.eval(pl.element().str.strip_chars()).list.contains(selected_player)
         ).head(1)
