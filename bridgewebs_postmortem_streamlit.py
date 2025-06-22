@@ -167,28 +167,38 @@ def player_selection_on_change():
 
         # --- END OF DEFERRED PROCESSING ---
         
+        st.error("2")
         all_pairs = st.session_state.combined_ns_ew_pairs
+        st.error("3")
         pair_row_df = all_pairs.filter(
             pl.col('players').str.split('&').list.eval(pl.element().str.strip_chars()).list.contains(selected_player)
         ).head(1)
+        st.error("4")
 
+        st.error("5")
         if pair_row_df.is_empty():
+            st.error("6")
             with st.session_state.main_section_container.container():
                 st.error(f"Could not find pair for player: {selected_player}")
             return
+        st.error("7")
 
         pair_row = pair_row_df.row(0, named=True)
+        st.error("8")
 
         st.session_state.player_name = selected_player
         st.session_state.player_id = selected_player
+        st.error("10")
         
         players_list = [p.strip() for p in pair_row['players'].split('&')]
         partner_index = 1 - players_list.index(selected_player)
         st.session_state.partner_name = players_list[partner_index]
         st.session_state.partner_id = st.session_state.partner_name
+        st.error("20")
 
         st.session_state.pair_direction = 'NS' if pair_row['direction'].startswith('N') else 'EW'
         st.session_state.pair_id = pair_row['pair_number']
+        st.error("30")
 
         if players_list.index(selected_player) == 0:
             st.session_state.player_direction = st.session_state.pair_direction[0]
@@ -196,8 +206,10 @@ def player_selection_on_change():
         else:
             st.session_state.player_direction = st.session_state.pair_direction[1]
             st.session_state.partner_direction = st.session_state.pair_direction[0]
+        st.error("40")
 
         st.session_state.opponent_pair_direction = 'EW' if st.session_state.pair_direction == 'NS' else 'NS'
+        st.error("50")
 
         df_filtered = filter_dataframe(
             st.session_state.df_unfiltered,
@@ -208,19 +220,25 @@ def player_selection_on_change():
             st.session_state.partner_direction,
             st.session_state.partner_id
         )
+        st.error("60")
         
         st.session_state.df = df_filtered
+        st.error("72")
         # Re-register the filtered dataframe for querying
         st.session_state.con.register(st.session_state.con_register_name, st.session_state.df)
+        st.error("78")
 
         # Set ScorePercent based on pair direction
         score_col = f"ScorePercent_{st.session_state.pair_direction}"
+        st.error("80")
         if score_col in df_filtered.columns:
             st.session_state.ScorePercent = df_filtered.select(pl.col(score_col).first()).item()
         else:
             st.session_state.ScorePercent = None
+        st.error("90")
 
         read_configs()
+        st.error("100")
         
     except Exception as e:
         with st.session_state.main_section_container.container():
