@@ -39,7 +39,6 @@ from mlBridgeLib.mlBridgeAugmentLib import (
     AllAugmentations,
 )
 from mlBridgeWebsLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
-import re
 
 
 def ShowDataFrameTable(df, key, query='SELECT * FROM self', show_sql_query=True):
@@ -273,6 +272,8 @@ def change_game_state():
             if not all_results:
                 with st.session_state.main_section_container.container():
                     st.error(f"Could not parse any results from the URL: {url}")
+                    st.error(f"Please try a different URL. FYI, I only like to discuss mitchell movements.")
+                    st.stop()
                 return
 
             # If multiple sections are found, prompt user to select one first.
