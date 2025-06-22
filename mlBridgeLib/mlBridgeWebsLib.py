@@ -315,7 +315,8 @@ class BridgeWebResultsParser:
                         'north_south_results': pl.DataFrame(ns_res),
                         'east_west_results': pl.DataFrame(ew_res),
                         'tournament_info': pl.DataFrame([info]),
-                        'player_mpts': mpts_df
+                        'player_mpts': mpts_df,
+                        'msec': section['msec']
                     }
                 except Exception as e:
                     print(f"Error processing section {section['text']}: {e}")
@@ -327,12 +328,13 @@ class BridgeWebResultsParser:
         return self.all_results
 
 
-def read_pbn_file_from_url(source_url=None):
+def read_pbn_file_from_url(source_url=None, msec='1'):
     """
     Extracts pid, event, club from the source URL and downloads PBN data
     
     Args:
         source_url: URL in the form of https://www.bridgewebs.com/cgi-bin/bwoq/bw.cgi?pid=display_rank&event=20250526_1&club=irelandimps
+        msec: Section identifier (e.g., '1' for first section, '2' for second section)
     """
     if not source_url:
         st.error("PBN URL is not defined.")
@@ -364,7 +366,7 @@ def read_pbn_file_from_url(source_url=None):
     # Query parameters for PBN download
     params = {
         'pid': 'display_hands',
-        'msec': '1',
+        'msec': msec,
         'event': event,
         'wd': '1',
         'club': club,
@@ -481,7 +483,7 @@ def process_bridgewebs_url(url: str, single_dummy_sample_count: int = 10, progre
         )
 
         pbar.set_description("Downloading PBN file")
-        file_content = read_pbn_file_from_url(url)
+        file_content = read_pbn_file_from_url(url, msec='1')
         pbar.update(1)
 
         pbar.set_description("Parsing PBN file")

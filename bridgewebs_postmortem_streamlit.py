@@ -116,18 +116,30 @@ def prepare_for_player_selection(results):
 def section_selection_on_change():
     """Callback for when a user selects a new section."""
     try:
+        # Clear the main container window when section changes
+        st.session_state.main_section_container.empty()
+        
         selected_section_key = st.session_state.get('selected_section_key')
         if not selected_section_key:
             return
 
         # Clear old player-specific and processed data
         st.session_state.player_names = None
+        # Clear the selected player to reset the player selection widget
         if 'selected_player_key' in st.session_state:
-            st.session_state.selected_player_key = None
+            del st.session_state.selected_player_key
         st.session_state.df = None
         st.session_state.df_unfiltered = None
         
+        # Clear report-related session state to prevent auto-rendering
+        st.session_state.session_id = None
+        st.session_state.player_name = None
+        st.session_state.partner_name = None
+        st.session_state.ScorePercent = None
+        
         results = st.session_state.all_results[selected_section_key]
+        # Store the msec value for the selected section for PBN file download
+        st.session_state.selected_section_msec = results.get('msec', '1')
         prepare_for_player_selection(results)
         
     except Exception as e:
@@ -148,7 +160,9 @@ def player_selection_on_change():
                 url = st.session_state.game_results_url
                 parser_df = st.session_state.parser_df
 
-                file_content = read_pbn_file_from_url(url)
+                # Get the correct msec value for the selected section
+                msec = st.session_state.get('selected_section_msec', '1')
+                file_content = read_pbn_file_from_url(url, msec=msec)
                 boards = pbn.loads(file_content)
                 print(f"Parsed {len(boards)} boards from PBN file")
                 
@@ -276,6 +290,8 @@ def change_game_state():
                 # Otherwise, process the single section to get player names.
                 first_section_key = next(iter(all_results))
                 results = all_results[first_section_key]
+                # Store the msec value for the single section
+                st.session_state.selected_section_msec = results.get('msec', '1')
                 prepare_for_player_selection(results)
                 # Reset sidebar widget states for single section
                 if 'selected_player_key' in st.session_state:
@@ -514,6 +530,7 @@ def reset_game_data():
         'combined_ns_ew_pairs': None,
         'favorites': None,
         'ScorePercent': None,
+        'selected_section_msec': '1',
     }
     
     # Actually reset the session state variables to clear previous game data
