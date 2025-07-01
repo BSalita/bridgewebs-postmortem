@@ -97,15 +97,15 @@ def show_sql_query_change():
 
 def prepare_for_player_selection(results):
     """Lightweight processing to prepare for player selection."""
-    parser_df = (
+    parser_dfs = (
         results.get('north_south_results', pl.DataFrame()),
         results.get('east_west_results', pl.DataFrame()),
         results.get('tournament_info', pl.DataFrame())
     )
-    st.session_state.parser_df = parser_df
-    st.session_state.tournament_info = parser_df[2]
+    st.session_state.parser_dfs = parser_dfs # IMPORTANT!!!: this line causes a hang after section selection. Appears to be a memory management disposal bug in polars.
+    st.session_state.tournament_info = parser_dfs[2]
     
-    combined_ns_ew_pairs = pl.concat([parser_df[0], parser_df[1]])
+    combined_ns_ew_pairs = pl.concat([parser_dfs[0], parser_dfs[1]])
     st.session_state.combined_ns_ew_pairs = combined_ns_ew_pairs
     
     player_names_series = combined_ns_ew_pairs['players'].str.split('&').list.explode().str.strip_chars()
@@ -148,7 +148,7 @@ def section_selection_on_change():
 
 
 def player_selection_on_change():
-    try:
+    #try:
         selected_player = st.session_state.get('selected_player_key')
         if not selected_player:
             return
@@ -157,16 +157,19 @@ def player_selection_on_change():
         if 'df_unfiltered' not in st.session_state or st.session_state.df_unfiltered is None:
             with st.spinner('Downloading and processing deal data... This may take a moment.'):
                 url = st.session_state.game_results_url
-                parser_df = st.session_state.parser_df
+                parser_dfs = st.session_state.parser_dfs
 
                 # Get the correct msec value for the selected section
                 msec = st.session_state.get('selected_section_msec', '1')
                 file_content = read_pbn_file_from_url(url, msec=msec)
                 boards = pbn.loads(file_content)
                 print(f"Parsed {len(boards)} boards from PBN file")
-                
+                for b in boards.copy():
+                    if len(b.deal.to_pbn()) != 69:
+                        st.error(f"Ignoring invalid Deal: Board:{b.board_num} {b.deal.to_pbn()}")
+                        boards.remove(b)
                 path_url = pathlib.Path(url)
-                df = merge_parsed_and_pbn_dfs(path_url, boards, parser_df)
+                df = merge_parsed_and_pbn_dfs(path_url, boards, parser_dfs)
                 
                 augmenter = AllAugmentations(df, None, sd_productions=st.session_state.single_dummy_sample_count, progress=st.progress(0), lock_func=perform_hand_augmentations_queue)
                 df, _ = augmenter.perform_all_augmentations()
@@ -174,8 +177,8 @@ def player_selection_on_change():
                 assert df.select(pl.col(pl.Object)).is_empty(), f"Found Object columns: {[col for col, dtype in df.schema.items() if dtype == pl.Object]}"
                 
                 st.session_state.df_unfiltered = df
-                st.session_state.session_id = parser_df[2]['results_session'].item()
-                st.session_state.group_id = parser_df[2]['club'].item()
+                st.session_state.session_id = parser_dfs[2]['results_session'].item()
+                st.session_state.group_id = parser_dfs[2]['club'].item()
                 st.session_state.con.register(st.session_state.con_register_name, df)
 
         # --- END OF DEFERRED PROCESSING ---
@@ -236,14 +239,14 @@ def player_selection_on_change():
 
         read_configs()
         
-    except Exception as e:
-        with st.session_state.main_section_container.container():
-            st.error(f"Error processing player selection: {str(e)}")
-            st.text(f"Player: {st.session_state.get('selected_player_key', 'Unknown')}")
-            st.text("Please try selecting a different player.")
-            # Clear the problematic player selection
-            if 'selected_player_key' in st.session_state:
-                st.session_state.selected_player_key = None
+    # except Exception as e:
+    #     with st.session_state.main_section_container.container():
+    #         st.error(f"Error processing player selection: {str(e)}")
+    #         st.text(f"Player: {st.session_state.get('selected_player_key', 'Unknown')}")
+    #         st.text("Please try selecting a different player.")
+    #         # Clear the problematic player selection
+    #         if 'selected_player_key' in st.session_state:
+    #             st.session_state.selected_player_key = None
 
 
 def change_game_state():
@@ -526,7 +529,7 @@ def reset_game_data():
         'current_datetime': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         # Clear data that could affect display
         'all_results': None,
-        'parser_df': None,
+        'parser_dfs': None,
         'tournament_info': None,
         'combined_ns_ew_pairs': None,
         'favorites': None,
@@ -644,7 +647,7 @@ class PBNResultsCalculator(PostmortemBase):
             'show_sql_query': True, # os.getenv('STREAMLIT_ENV') == 'development',
             'use_historical_data': False,
             'do_not_cache_df': True, # todo: set to True for production
-            'con': duckdb.connect(),
+            'con': duckdb.connect(), # IMPORTANT: duckdb.connect() hung until previous version was installed.
             'con_register_name': 'self',
             'main_section_container': st.empty(),
             'app_datetime': datetime.fromtimestamp(pathlib.Path(__file__).stat().st_mtime, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z'),
@@ -767,7 +770,7 @@ class PBNResultsCalculator(PostmortemBase):
             report_your_match_info = f"Your pair was {st.session_state.pair_id}{st.session_state.pair_direction} {'' if st.session_state.section_name is None else 'in section '+st.session_state.section_name}. You played {st.session_state.player_direction}. Your partner was {st.session_state.partner_name} {'' if st.session_state.partner_name == st.session_state.partner_id else '('+st.session_state.partner_id+')'} who played {st.session_state.partner_direction}. Your pair scored {st.session_state.ScorePercent}%"
             # Create a dummy anchor well above the title so title appears at top when scrolling
             st.markdown('<div style="height: 50px;"><a name="top-of-report"></a></div>', unsafe_allow_html=True)
-            st.markdown(f'<h3 id="report-title">{report_title}</h3>', unsafe_allow_html=True)
+            st.markdown(f"### {report_title}")
             st.markdown(f"##### {report_creator}")
             st.markdown(f"#### {report_event_info}")
             st.markdown(f"##### {report_game_results_webpage}")

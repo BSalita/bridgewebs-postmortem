@@ -476,7 +476,7 @@ def process_bridgewebs_url(url: str, single_dummy_sample_count: int = 10, progre
         first_section_key = next(iter(all_results))
         results = all_results[first_section_key]
 
-        parser_df_tuple = (
+        parser_dfs = (
             results.get('north_south_results', pl.DataFrame()),
             results.get('east_west_results', pl.DataFrame()),
             results.get('tournament_info', pl.DataFrame())
@@ -493,7 +493,7 @@ def process_bridgewebs_url(url: str, single_dummy_sample_count: int = 10, progre
 
         pbar.set_description("Merging parsed and PBN data")
         path_url = pathlib.Path(url)
-        df = merge_parsed_and_pbn_dfs(path_url, boards, parser_df_tuple)
+        df = merge_parsed_and_pbn_dfs(path_url, boards, parser_dfs)
         pbar.update(1)
 
         pbar.set_description("Augmenting data")
@@ -504,10 +504,10 @@ def process_bridgewebs_url(url: str, single_dummy_sample_count: int = 10, progre
         
         pbar.set_description("Filtering data for top pair")
         info = {}
-        info['session_id'] = parser_df_tuple[2]['results_session'].item()
-        info['group_id'] = parser_df_tuple[2]['club'].item()
+        info['session_id'] = parser_dfs[2]['results_session'].item()
+        info['group_id'] = parser_dfs[2]['club'].item()
 
-        combined_ns_ew_pairs = pl.concat([parser_df_tuple[0], parser_df_tuple[1]])
+        combined_ns_ew_pairs = pl.concat([parser_dfs[0], parser_dfs[1]])
 
         pair_row = combined_ns_ew_pairs.sort('score_percent', descending=True).head(1)
         pair_number = pair_row['pair_number'].item()

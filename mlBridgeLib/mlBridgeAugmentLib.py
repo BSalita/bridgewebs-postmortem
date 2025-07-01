@@ -220,16 +220,16 @@ def calculate_ddtricks_par_scores(hrs_df: pl.DataFrame, hrs_cache_df: pl.DataFra
     print(f"{hrs_df.height=}")
     print(f"{hrs_cache_df.height=}")
     assert hrs_df['PBN'].null_count() == 0, "PBNs in df must be non-null"
+    assert hrs_df.filter(pl.col('PBN').str.len_chars().ne(69)).height == 0, hrs_df.filter(pl.col('PBN').str.len_chars().ne(69))
     assert hrs_cache_df['PBN'].null_count() == 0, "PBNs in hrs_cache_df must be non-null"
-    unique_hrs_df = hrs_df.unique(subset=['PBN']) # could be non-unique PBN with difference Dealer, Vul.
-    print(f"{len(unique_hrs_df)=}")
-    unique_hrs_df_pbns = unique_hrs_df['PBN'] # could be non-unique PBN with difference Dealer, Vul.
+    assert hrs_cache_df.filter(pl.col('PBN').str.len_chars().ne(69)).height == 0, hrs_cache_df.filter(pl.col('PBN').str.len_chars().ne(69))
+    unique_hrs_df_pbns = set(hrs_df['PBN']) # could be non-unique PBN with difference Dealer, Vul.
     print(f"{len(unique_hrs_df_pbns)=}")
     hrs_cache_with_nulls_df = hrs_cache_df.filter(pl.col('DD_N_C').is_null() | pl.col('ParScore').is_null())
     print(f"{len(hrs_cache_with_nulls_df)=}")
     hrs_cache_with_nulls_pbns = hrs_cache_with_nulls_df['PBN']
     print(f"{len(hrs_cache_with_nulls_pbns)=}")
-    unique_hrs_cache_with_nulls_pbns = hrs_cache_with_nulls_pbns.unique()
+    unique_hrs_cache_with_nulls_pbns = set(hrs_cache_with_nulls_pbns)
     print(f"{len(unique_hrs_cache_with_nulls_pbns)=}")
     
     # FIXED: Correct the logic

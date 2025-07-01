@@ -185,7 +185,9 @@ def extract_club_result_json(dfs, filtered_clubs, starting_nclub, ending_nclub, 
                 # some clubs return 200 (ok) but with instructions to login (len < 200).
                 # skip clubs returning errors or tiny files. assumes one failed club result will be true for all club's results.
                 if r.status_code != 200 or len(html) < 200:
+                    print_to_log_info(f'Error: {r.status_code} len:{len(html)} {url}. Waiting 60s.')
                     failed_urls.append(url)
+                    time.sleep(60) # wait 1 minute before retrying.
                     break
                 # pathlib.Path.mkdir(html_path.parent, parents=True, exist_ok=True)
                 html_path.parent.mkdir(parents=True, exist_ok=True)
@@ -205,7 +207,7 @@ def extract_club_result_json(dfs, filtered_clubs, starting_nclub, ending_nclub, 
                                 json.dump(data_json, f, indent=2)
                             bbo_tournament_id = data_json["bbo_tournament_id"]
                             print_to_log_info(f'bbo_tournament_id: {bbo_tournament_id}')
-                #time.sleep(1) # obsolete?
+                time.sleep(2) # need to self-throttle otherwise acbl returns 403 "forbidden". looks like sleep of 1 second has become insufficient in 2025-Jun.
             # if no data_json file read, must be an error so delete both html and json files.
             if not data_json:
                 html_path.unlink(missing_ok=True)
