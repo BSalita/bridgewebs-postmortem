@@ -6,7 +6,7 @@ stqdm
 openai
 pandas
 # polars 1.31 errored on innocent statement in bridgewebs_postmortem_streamlit.py. change following when fixed.
-polars==1.30
+polars<1.31
 duckdb
 requests
 urllib3

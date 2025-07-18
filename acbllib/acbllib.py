@@ -70,7 +70,7 @@ def get_club_results(cns, base_url, acbl_url, acblPath, read_local):
             # pathlib.Path.mkdir(path.parent, parents=True, exist_ok=True)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(html, encoding="utf-8")
-            time.sleep(1) # need to self-throttle otherwise acbl returns 403 "forbidden". obsolete?
+            time.sleep(2) # need to self-throttle otherwise acbl returns 403 "forbidden". obsolete?
         htmls[str(cn)] = html
     print_to_log_info(f'Failed Urls: len:{len(failed_urls)} Urls:{failed_urls}')
     print_to_log_info(f"Done: Total clubs processed:{total_clubs}: Total url failures:{len(failed_urls)}")
@@ -350,7 +350,7 @@ def club_results_create_sql_db(db_file_connection_string, create_tables_sql_file
             print_to_log_info(f"Performing integrity_check on file")
             raw_connection.execute("PRAGMA integrity_check;") # takes 25m on disk
         if not write_direct_to_disk:
-            print_to_log_info(f"Writing memory db to file (takes 1+ hours):{db_file_connection_string}")
+            print_to_log_info(f"Writing memory db to file:{db_file_connection_string}")
             engine_file = sqlalchemy.create_engine(db_file_connection_string)
             raw_connection_file = engine_file.raw_connection()
             raw_connection.backup(raw_connection_file.connection) # takes 45m
