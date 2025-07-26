@@ -594,6 +594,7 @@ def create_best_contracts(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def convert_contract_to_contract(df: pl.DataFrame) -> pl.Series:
+    # todo: use strain to strai dict instead of suit symbol. Replace replace() with replace_strict().
     return df['Contract'].str.to_uppercase().str.replace('♠','S').str.replace('♥','H').str.replace('♦','D').str.replace('♣','C').str.replace('NT','N')
 
 
@@ -664,7 +665,7 @@ def convert_contract_to_DD_Score_Ref(df: pl.DataFrame) -> pl.DataFrame:
         pl.struct([f"DD_{direction}_{strain}", f"Vul_{pair_direction}"]) # todo: change Vul_{pair_direction} to use iVul so brs_df can be used without joining Vul_(NS|EW).
         .map_elements(
             lambda r, lvl=level, strn=strain, dir=direction, pdir=pair_direction: 
-                scores_d.get((lvl, strn, r[f"DD_{dir}_{strn}"], r[f"Vul_{pdir}"]), None),
+                scores_d.get((lvl, strn, r[f"DD_{dir}_{strn}"], r[f"Vul_{pdir}"]), 0), # default becomes 0. ok? should only occur in the case of null (PASS).
             return_dtype=pl.Int16
         )
         .alias(f"DD_Score_{level}{strain}_{direction}")
@@ -1645,7 +1646,7 @@ class FinalContractAugmenter:
                     "convert_contract_to_score",
                     lambda df: df.with_columns([
                         pl.struct(['BidLvl', 'BidSuit', 'Tricks', 'Vul_Declarer', 'Dbl'])
-                            .map_elements(lambda x: all_scores_d.get(tuple(x.values()),None),
+                            .map_elements(lambda x: all_scores_d.get(tuple(x.values()),0), # default becomes 0. ok? should only occur in the case of null (PASS).
                                         return_dtype=pl.Int16)
                             .alias('Score'),
                     ]),
@@ -1813,7 +1814,7 @@ class FinalContractAugmenter:
                     .map_elements(lambda x: None if x['EV_Score_Col_Declarer'] is None else x[x['EV_Score_Col_Declarer']],
                                 return_dtype=pl.Float32).alias('EV_Score_Declarer'),
                 pl.struct(['BidLvl', 'BidSuit', 'Tricks', 'Vul_Declarer', 'Dbl'])
-                    .map_elements(lambda x: all_scores_d.get(tuple(x.values()),None),
+                    .map_elements(lambda x: all_scores_d.get(tuple(x.values()),0), # default becomes 0. ok? should only occur in the case of null (PASS).
                                 return_dtype=pl.Int16)
                     .alias('Computed_Score_Declarer'),
 
