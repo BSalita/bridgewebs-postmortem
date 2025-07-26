@@ -38,7 +38,7 @@ from mlBridgeLib.mlBridgePostmortemLib import PostmortemBase
 from mlBridgeLib.mlBridgeAugmentLib import (
     AllAugmentations,
 )
-from mlBridgeWebsLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
+from mlBridgeBWLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
 
 
 def ShowDataFrameTable(df, key, query='SELECT * FROM self', show_sql_query=True):
