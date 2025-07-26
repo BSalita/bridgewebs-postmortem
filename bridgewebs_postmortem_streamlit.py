@@ -253,7 +253,7 @@ def change_game_state():
 
     st.session_state.main_section_container.empty()
 
-    # not working in this location but does work in write_report(). works well in other postmortem.py files though.
+    # not working in this location but does work in write_report(). works well in ffbridge though so there's some subtle difference.
     # st.markdown('<div style="height: 50px;"><a name="top-of-report"></a></div>', unsafe_allow_html=True)
 
     try:
