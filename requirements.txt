@@ -14,7 +14,7 @@ python-dotenv
 tenacity
 termcolor
 streamlit-chat
-bs4
+beautifulsoup4
 endplay
 pyparse
 #pyparse>=3.0.0

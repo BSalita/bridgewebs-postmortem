@@ -7,9 +7,9 @@ Supports extraction of Teams, Board Results, and Boards DataFrames with French t
 
 import asyncio
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any, Tuple
 import polars as pl
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, Page, BrowserContext
 import logging
 from contextlib import asynccontextmanager
 import time
@@ -77,32 +77,44 @@ async def get_browser_context_async():
             logger.error(f"Error closing browser context: {e}")
 
 # Global translation constants to avoid duplication
-FRENCH_TO_ENGLISH_STRAIN_MAP = {
+FRENCH_TO_ENGLISH_STRAIN_MAP: Dict[str, str] = {
     'P': 'S',    # Spades (Piques)
     'C': 'H',    # Hearts (Cœurs)
     'K': 'D',    # Diamonds (Carreau)
     'T': 'C',    # Clubs (Trèfle)
-    'sa': 'N',    # No Trump (Sans Atout)
+    'sa': 'N',    # No Trump (Sans Atout) - lowercase
     'SA': 'N',    # No Trump (Sans Atout) - uppercase
     '♠': 'S',
     '♥': 'H',
     '♦': 'D',
     '♣': 'C',
+    'pique': 'S',    # Spades
+    'coeur': 'H',    # Hearts  
+    'carreau': 'D',  # Diamonds
+    'trefle': 'C',   # Clubs
 }
 
-FRENCH_TO_ENGLISH_DIRECTION_MAP = {
+FRENCH_TO_ENGLISH_DIRECTION_MAP: Dict[str, str] = {
     'N': 'N',    # North (Nord)
     'E': 'E',    # East (Est)
     'S': 'S',    # South (Sud)
-    'O': 'W'     # West (Ouest)
+    'W': 'W',    # West (Ouest)
+    'Nord': 'N',
+    'Est': 'E',
+    'Sud': 'S',
+    'Ouest': 'W',
 }
 
-FRENCH_TO_ENGLISH_CARDS_MAP = {
-    'A': 'A',    # Ace
+FRENCH_TO_ENGLISH_CARD_MAP: Dict[str, str] = {
+    'P': 'S',    # Pique -> Spade
+    'C': 'H',    # Cœur -> Heart
+    'K': 'D',    # Carreau -> Diamond
+    'T': 'C',    # Trèfle -> Club
+    'A': 'A',    # As -> Ace
     'R': 'K',    # Roi -> King
     'D': 'Q',    # Dame -> Queen
     'V': 'J',    # Valet -> Jack
-    '0': 'T',    # 10 -> Ten
+    '10': 'T',   # 10 -> T
     '9': '9',
     '8': '8',
     '7': '7',
@@ -114,14 +126,14 @@ FRENCH_TO_ENGLISH_CARDS_MAP = {
     '1': '',
 }
 
-FRENCH_TO_ENGLISH_VULNERABILITY_MAP = {
+FRENCH_TO_ENGLISH_VULNERABILITY_MAP: Dict[str, str] = {
     'Personne': 'None',
     'Nord-Sud': 'N_S',
     'Est-Ouest': 'E_W',
     'Tous': 'Both',
 }
 
-FRENCH_MONTHS = {
+FRENCH_MONTHS: Dict[str, str] = {
     'janvier': 'january', 'février': 'february', 'mars': 'march', 'avril': 'april',
     'mai': 'may', 'juin': 'june', 'juillet': 'july', 'août': 'august',
     'septembre': 'september', 'octobre': 'october', 'novembre': 'november', 'décembre': 'december'
@@ -207,7 +219,7 @@ def translate_cards(card_text: str) -> str:
         translated = FRENCH_TO_ENGLISH_STRAIN_MAP[first_char] + rest_of_text
     
     # Replace French cards with English equivalents
-    for french_card, english_card in FRENCH_TO_ENGLISH_CARDS_MAP.items():
+    for french_card, english_card in FRENCH_TO_ENGLISH_CARD_MAP.items():
         translated = translated.replace(french_card, english_card)
     
     return translated
@@ -226,7 +238,7 @@ def translate_pbn_cards(pbn_text: str) -> str:
     
     # Replace French cards with English equivalents
     translated = pbn_text
-    for french_card, english_card in FRENCH_TO_ENGLISH_CARDS_MAP.items():
+    for french_card, english_card in FRENCH_TO_ENGLISH_CARD_MAP.items():
         translated = translated.replace(french_card, english_card)
     
     return translated
@@ -875,7 +887,7 @@ async def parse_boards_html_async(page) -> List[Dict]:
             french_vul = vul_match.group(1).strip()
             if french_vul:
                 # Translate French vulnerability to English using the global map
-                vul = FRENCH_TO_ENGLISH_VULNERABILITY_MAP.get(french_vul, french_vul)
+                vul = FRENCH_TO_ENGLISH_VULNERABILITY_MAP[french_vul]
                 logger.info(f"Extracted vulnerability: {vul}")
             else:
                 raise ValueError(f"Could not find vulnerability in HTML div with required classes (col-8, p-0, h2)")
@@ -980,7 +992,7 @@ async def parse_boards_html_async(page) -> List[Dict]:
         else:
             raise ValueError("Could not find colorized row for score extraction")
         
-        # Find the contract span using your suggested pattern
+        # Find the contract span
         contract_span_pattern = r'<span\s+[^>]*class=["\'][^"\']*gros[^"\']*["\'][^>]*>.*?Contrat\s.*?<\/span>'
         contract_span_match = re.search(contract_span_pattern, page_content, re.DOTALL)
         if contract_span_match:
@@ -1006,21 +1018,15 @@ async def parse_boards_html_async(page) -> List[Dict]:
             raise ValueError(f"Could not find level in contract span: {contract_span_html}")
         
         # Extract suit from nested span
-        suit_span_match = re.search(r'<span class="([^"]*)">[^<]*</span>', contract_span_html)
-        if suit_span_match:
+        suit_span_match = re.search(r'Contrat.*?(?:<span class="(pique|coeur|carreau|trefle)">[^<]*</span>|(SA))', contract_span_html)
+        if suit_span_match and suit_span_match.group(1):  # Suit class found
             suit_class = suit_span_match.group(1)
-            # Map French suit classes to English
-            suit_map = {
-                'pique': 'S',    # Spades
-                'coeur': 'H',    # Hearts  
-                'carreau': 'D',  # Diamonds
-                'trefle': 'C',   # Clubs
-                'sa': 'N'        # No Trump
-            }
-            strain = suit_map.get(suit_class, 'N')
-            logger.info(f"Extracted strain: {strain}")
+        elif suit_span_match and suit_span_match.group(2):  # SA match found
+            suit_class = suit_span_match.group(2)
         else:
             raise ValueError(f"Could not find suit in contract span: {contract_span_html}")
+        strain = FRENCH_TO_ENGLISH_STRAIN_MAP[suit_class]
+        logger.info(f"Extracted strain: {strain}")
         
         contract = level + strain + declarer
         
@@ -1074,7 +1080,7 @@ async def parse_boards_html_async(page) -> List[Dict]:
         boards_data.append({
             'Board': board_number,
             'PBN': pbn,
-            'Top': top,
+            'MP_Top': top,
             'Dealer': dealer,
             'Vul': vul,
             'Declarer': declarer,
@@ -1500,7 +1506,7 @@ async def request_boards_dataframe_async(url: str, context=None) -> Dict[str, pl
                 boards_df = pl.DataFrame(schema={
                     'Board': pl.UInt32,
                     'PBN': pl.Utf8,
-                    'Top': pl.UInt64,
+                    'MP_Top': pl.UInt64,
                     'Dealer': pl.Utf8,
                     'Vul': pl.Utf8,
                     'Declarer': pl.Utf8,
@@ -1542,7 +1548,7 @@ async def request_boards_dataframe_async(url: str, context=None) -> Dict[str, pl
             empty_boards_df = pl.DataFrame(schema={
                 'Board': pl.UInt32,
                 'PBN': pl.Utf8,
-                'Top': pl.UInt32,
+                'MP_Top': pl.UInt32,
                 'Dealer': pl.Utf8,
                 'Vul': pl.Utf8,
                 'Declarer': pl.Utf8,
@@ -1945,7 +1951,7 @@ async def get_all_boards_async(tr: str, cl: str, max_deals: int = 36, context=No
             combined_boards = pl.DataFrame(schema={
                 'Board': pl.UInt32,
                 'PBN': pl.Utf8,
-                'Top': pl.UInt32,
+                'MP_Top': pl.UInt32,
                 'Dealer': pl.Utf8,
                 'Vul': pl.Utf8,
                 'Declarer': pl.Utf8,
@@ -1982,12 +1988,14 @@ async def get_all_boards_async(tr: str, cl: str, max_deals: int = 36, context=No
         logger.error(f"Error in get_all_boards_async: {e}")
         raise
 
-def get_all_boards(tr: str, cl: str, max_deals: int = 36) -> Dict[str, pl.DataFrame]:
+def get_all_boards(tr: str, cl: str, eq: str, sc: str, max_deals: int = 36) -> Dict[str, pl.DataFrame]:
     """Get all boards data for a tournament (non-async wrapper).
     
     Args:
         tr: Tournament ID (e.g., 'S202602')
         cl: Club ID (e.g., '5802079')
+        eq: Team number (e.g., '212')
+        sc: Section (e.g., 'A')
         max_deals: Maximum number of deals to try (default is 36)
         
     Returns:
@@ -1996,9 +2004,9 @@ def get_all_boards(tr: str, cl: str, max_deals: int = 36) -> Dict[str, pl.DataFr
     Raises:
         ValueError: If no teams found in the tournament
     """
-    return asyncio.run(get_all_boards_async(tr, cl, max_deals))
+    return asyncio.run(get_all_boards_async(tr, cl, eq, sc, max_deals))
 
-async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: str, context=None) -> Dict[str, pl.DataFrame]:
+async def get_all_boards_for_player_async(tr: str, cl: str, eq: str, sc: str, context=None) -> Dict[str, pl.DataFrame]:
     """Get all boards data for a specific player by finding their team.
     
     This function only returns boards that the player actually played, not all possible boards.
@@ -2007,7 +2015,8 @@ async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: s
     Args:
         tr: Tournament ID (e.g., 'S202602')
         cl: Club ID (e.g., '5802079')
-        player_id: Player ID to search for (matches against Player1_ID or Player2_ID)
+        eq: Team number (e.g., '212')
+        sc: Section (e.g., 'A')
         max_deals: Maximum number of deals to consider (default is 36)
         context: Optional browser context (for reuse)
         
@@ -2019,31 +2028,9 @@ async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: s
         ValueError: If player not found in any team
     """
     try:
-        # Get all teams for the tournament and club
-        teams_df = await get_teams_by_tournament_async(tr, cl)
-        
-        # Normalize player_id by stripping leading zeros for robust string comparison
-        norm_player_id = player_license_id.lstrip('0')
-        
-        # Find the team where the player_id matches either Player1_ID or Player2_ID
-        # Normalize DataFrame columns by stripping leading zeros before comparison
-        player_team = teams_df.filter(
-            (pl.col('Player1_ID').str.strip_chars_start('0') == norm_player_id) | 
-            (pl.col('Player2_ID').str.strip_chars_start('0') == norm_player_id)
-        )
-        
-        # Check if player was found
-        if len(player_team) == 0:
-            raise ValueError(f"Player {player_license_id} not found in tournament {tr}, club {cl}")
-        
-        # Get the section and team number from the extracted data
-        sc = player_team['Section'].first()
-        team_number = player_team['Team_Number'].first()
-        
-        logger.info(f"Found player {player_license_id} in team {team_number}, section {sc}")
         
         # First, get the route data to see which boards this team actually played
-        route_url = f"https://www.bridgeplus.com/nos-simultanes/resultats/?p=route&res=sim&eq={team_number}&tr={tr}&cl={cl}&sc={sc}"
+        route_url = f"https://www.bridgeplus.com/nos-simultanes/resultats/?p=route&res=sim&eq={eq}&tr={tr}&cl={cl}&sc={sc}"
         logger.info(f"Getting route data from: {route_url}")
         
         played_boards = []
@@ -2051,7 +2038,7 @@ async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: s
             try:
                 route_results = await request_board_results_dataframe_async(route_url, context)
                 if len(route_results) == 0:
-                    logger.warning(f"No route data found for team {team_number}. URL: {route_url}")
+                    logger.warning(f"No route data found for team {eq}. URL: {route_url}")
                     logger.warning("This could mean:")
                     logger.warning("  1. Team doesn't exist")
                     logger.warning("  2. Team didn't play any boards")
@@ -2063,18 +2050,18 @@ async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: s
                     teams_df = await get_teams_by_tournament_async(tr, cl)
                     team_exists = len(teams_df.filter(
                         (pl.col('Section') == sc) & 
-                        (pl.col('Team_Number') == str(team_number))
+                        (pl.col('Team_Number') == str(eq))
                     )) > 0
                     
                     if team_exists:
-                        logger.warning(f"Team {team_number} exists in section {sc} but has no route data")
+                        logger.warning(f"Team {eq} exists in section {sc} but has no route data")
                         logger.warning("This might mean the team didn't play any boards")
                         # Return empty DataFrames instead of raising error
                         return {
                             'boards': pl.DataFrame(schema={
                                 'Board': pl.UInt32,
                                 'PBN': pl.Utf8,
-                                'Top': pl.UInt32,
+                                'MP_Top': pl.UInt32,
                                 'Dealer': pl.Utf8,
                                 'Vul': pl.Utf8,
                                 'Declarer': pl.Utf8,
@@ -2102,25 +2089,25 @@ async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: s
                             })
                         }
                     else:
-                        logger.error(f"Team {team_number} does not exist in section {sc}")
+                        logger.error(f"Team {eq} does not exist in section {sc}")
                         available_teams = teams_df.filter(pl.col('Section') == sc)['Team_Number'].to_list()
                         logger.error(f"Available teams in section {sc}: {available_teams}")
-                        raise ValueError(f"Team {team_number} not found in section {sc}. Available teams: {available_teams}")
+                        raise ValueError(f"Team {eq} not found in section {sc}. Available teams: {available_teams}")
                 else:
                     played_boards = route_results['Board'].to_list()
-                    logger.info(f"Found {len(played_boards)} boards played by team {team_number}: {played_boards}")
+                    logger.info(f"Found {len(played_boards)} boards played by team {eq}: {played_boards}")
                     
             except Exception as e:
-                logger.error(f"Error getting route data for team {team_number}: {e}")
+                logger.error(f"Error getting route data for team {eq}: {e}")
                 raise
         
         if not played_boards:
-            logger.warning(f"No boards found in route data for team {team_number}, returning empty results")
+            logger.warning(f"No boards found in route data for team {eq}, returning empty results")
             return {
                 'boards': pl.DataFrame(schema={
                     'Board': pl.UInt32,
                     'PBN': pl.Utf8,
-                    'Top': pl.UInt32,
+                    'MP_Top': pl.UInt32,
                     'Dealer': pl.Utf8,
                     'Vul': pl.Utf8,
                     'Declarer': pl.Utf8,
@@ -2156,7 +2143,7 @@ async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: s
             for deal_num in played_boards:
                 try:
                     # Build the URL directly since we already have the team info
-                    boards_url = f"https://www.bridgeplus.com/nos-simultanes/resultats/?p=donne&res=sim&d={deal_num}&eq={team_number}&tr={tr}&cl={cl}&sc={sc}"
+                    boards_url = f"https://www.bridgeplus.com/nos-simultanes/resultats/?p=donne&res=sim&d={deal_num}&eq={eq}&tr={tr}&cl={cl}&sc={sc}"
                     logger.info(f"Getting board data for deal {deal_num}: {boards_url}")
                     result = await request_boards_dataframe_async(boards_url, context)
                     if len(result['boards']) > 0:
@@ -2164,7 +2151,7 @@ async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: s
                     if len(result['score_frequency']) > 0:
                         all_frequency.append(result['score_frequency'])
                 except Exception as e:
-                    logger.warning(f"Failed to scrape board {deal_num} for player {player_license_id}: {e}")
+                    logger.warning(f"Failed to scrape board {deal_num} for player {eq}: {e}")
                     continue
         
         # Combine all boards and frequency data
@@ -2174,7 +2161,7 @@ async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: s
             combined_boards = pl.DataFrame(schema={
                 'Board': pl.UInt32,
                 'PBN': pl.Utf8,
-                'Top': pl.UInt32,
+                'MP_Top': pl.UInt32,
                 'Dealer': pl.Utf8,
                 'Vul': pl.Utf8,
                 'Declarer': pl.Utf8,
@@ -2212,16 +2199,17 @@ async def get_all_boards_for_player_async(tr: str, cl: str, player_license_id: s
         return boards_data
         
     except Exception as e:
-        logger.error(f"Error getting boards for player {player_license_id} in tournament {tr}, club {cl}: {e}")
+        logger.error(f"Error getting boards for player {eq} in tournament {tr}, club {cl}: {e}")
         raise
 
-def get_all_boards_for_player(tr: str, cl: str, player_license_id: str, max_deals: int = 36) -> Dict[str, pl.DataFrame]:
+def get_all_boards_for_player(tr: str, cl: str, eq: str, sc: str, max_deals: int = 36) -> Dict[str, pl.DataFrame]:
     """Get all boards data for a specific player by finding their team (non-async wrapper).
     
     Args:
         tr: Tournament ID (e.g., 'S202602')
         cl: Club ID (e.g., '5802079')
-        player_id: Player ID to search for (matches against Player1_ID or Player2_ID)
+        eq: Team number (e.g., '212')
+        sc: Section (e.g., 'A')
         max_deals: Maximum number of deals to scrape (default is 36)
         
     Returns:
@@ -2231,7 +2219,7 @@ def get_all_boards_for_player(tr: str, cl: str, player_license_id: str, max_deal
     Raises:
         ValueError: If player not found in any team or browser automation not available
     """
-    return asyncio.run(get_all_boards_for_player_async(tr, cl, player_license_id, max_deals))
+    return asyncio.run(get_all_boards_for_player_async(tr, cl, eq, sc, max_deals))
 
 async def main_async():
     """Main function to demonstrate optimized library usage with performance improvements."""
@@ -2816,7 +2804,7 @@ async def get_all_boards_for_team_async(tr: str, cl: str, sc: str, eq: str, max_
         combined_boards = pl.DataFrame(schema={
             'Board': pl.UInt32,
             'PBN': pl.Utf8,
-            'Top': pl.UInt32,
+            'MP_Top': pl.UInt32,
             'Dealer': pl.Utf8,
             'Vul': pl.Utf8,
             'Declarer': pl.Utf8,

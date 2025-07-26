@@ -252,7 +252,9 @@ def player_selection_on_change():
 def change_game_state():
 
     st.session_state.main_section_container.empty()
-    
+
+    st.markdown('<div style="height: 50px;"><a name="top-of-report"></a></div>', unsafe_allow_html=True)
+
     try:
         with st.spinner(f'Preparing Bridge Game Postmortem Report...'):
             reset_game_data() # wipe out all game state data
@@ -769,7 +771,7 @@ class PBNResultsCalculator(PostmortemBase):
             report_game_results_webpage = f"Results Page: {st.session_state.game_results_url}"
             report_your_match_info = f"Your pair was {st.session_state.pair_id}{st.session_state.pair_direction} {'' if st.session_state.section_name is None else 'in section '+st.session_state.section_name}. You played {st.session_state.player_direction}. Your partner was {st.session_state.partner_name} {'' if st.session_state.partner_name == st.session_state.partner_id else '('+st.session_state.partner_id+')'} who played {st.session_state.partner_direction}. Your pair scored {st.session_state.ScorePercent}%"
             # Create a dummy anchor well above the title so title appears at top when scrolling
-            st.markdown('<div style="height: 50px;"><a name="top-of-report"></a></div>', unsafe_allow_html=True)
+            #st.markdown('<div style="height: 50px;"><a name="top-of-report"></a></div>', unsafe_allow_html=True)
             st.markdown(f"### {report_title}")
             st.markdown(f"##### {report_creator}")
             st.markdown(f"#### {report_event_info}")
