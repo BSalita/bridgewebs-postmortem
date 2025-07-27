@@ -192,16 +192,15 @@ def calc_double_dummy_deals(deals: List[Deal], batch_size: int = 40, output_prog
     all_result_tables = []
     for i,b in enumerate(range(0,len(deals),batch_size)):
         if output_progress:
-            if progress:
-                percent_complete = int(i*100/len(deals))
-                if hasattr(progress, 'progress'): # streamlit
-                    progress.progress(percent_complete, f"{percent_complete}%: Double dummies calculated for {i} of {len(deals)} unique deals.")
-                elif hasattr(progress, 'set_description'): # tqdm
-                    progress.set_description(f"{percent_complete}%: Double dummies calculated for {i} of {len(deals)} unique deals.")
-            else:
-                if i % 1000 == 0:
-                    percent_complete = int(i*100/len(deals))
-                    print(f"{percent_complete}%: Double dummies calculated for {i} of {len(deals)} unique deals.")
+            if i % 100 == 0: # only show progress every 100 batches
+                percent_complete = int(b*100/len(deals))
+                if progress:
+                    if hasattr(progress, 'progress'): # streamlit
+                        progress.progress(percent_complete, f"{percent_complete}%: Double dummies calculated for {b} of {len(deals)} unique deals.")
+                    elif hasattr(progress, 'set_description'): # tqdm
+                        progress.set_description(f"{percent_complete}%: Double dummies calculated for {b} of {len(deals)} unique deals.")
+                else:
+                    print(f"{percent_complete}%: Double dummies calculated for {b} of {len(deals)} unique deals.")
         result_tables = calc_all_tables(deals[b:b+batch_size])
         all_result_tables.extend(result_tables)
     if output_progress: 
@@ -595,6 +594,16 @@ def create_best_contracts(df: pl.DataFrame) -> pl.DataFrame:
 
 def convert_contract_to_contract(df: pl.DataFrame) -> pl.Series:
     # todo: use strain to strai dict instead of suit symbol. Replace replace() with replace_strict().
+    # todo: implement in case 'Contract' is not in self.df.columns but BidLvl, BidSuit, Dbl, Declarer_Direction are. Or perhaps as a comparison sanity check.
+    # self.df = self.df.with_columns(
+    #     # easier to use discrete replaces instead of having to slice contract (nt, pass would be a complication)
+    #     # first NT->N and suit symbols to SHDCN
+    #     # If BidLvl is None, make Contract None
+    #     pl.when(pl.col('BidLvl').is_null())
+    #     .then(None)
+    #     .otherwise(pl.col('BidLvl').cast(pl.String)+pl.col('BidSuit')+pl.col('Dbl')+pl.col('Declarer_Direction'))
+    #     .alias('Contract'),
+    # )
     return df['Contract'].str.to_uppercase().str.replace('♠','S').str.replace('♥','H').str.replace('♦','D').str.replace('♣','C').str.replace('NT','N')
 
 
@@ -2078,12 +2087,12 @@ class MatchPointAugmenter:
             # todo: assert self.df['EV_Pct_Max_NS'].between(0,1).all()
             # todo: assert self.df['EV_Pct_Max_EW'].between(0,1).all()
             lambda df: df.with_columns([
-                (pl.col('EV_Pct_Max_NS')-pl.col('Pct_NS')).alias('EV_Pct_Max_Diff_NS'), # todo: suspect this is wrong
-                (pl.col('EV_Pct_Max_EW')-pl.col('Pct_EW')).alias('EV_Pct_Max_Diff_EW'), # todo: suspect this is wrong
-                (pl.col('DD_Score_Pct_NS_Max')-pl.col('Par_Pct_NS')).alias('EV_Par_Pct_Diff_NS'), # todo: suspect this is wrong
-                (pl.col('DD_Score_Pct_EW_Max')-pl.col('Par_Pct_EW')).alias('EV_Par_Pct_Diff_EW'), # todo: suspect this is wrong
-                (pl.col('EV_Pct_Max_NS')-pl.col('Par_Pct_NS')).alias('EV_Par_Pct_Max_Diff_NS'), # todo: suspect this is wrong
-                (pl.col('EV_Pct_Max_EW')-pl.col('Par_Pct_EW')).alias('EV_Par_Pct_Max_Diff_EW'), # todo: suspect this is wrong
+                (pl.col('Pct_NS')-pl.col('EV_Pct_Max_NS')).alias('EV_Pct_Max_Diff_NS'),
+                (pl.col('Pct_EW')-pl.col('EV_Pct_Max_EW')).alias('EV_Pct_Max_Diff_EW'),
+                (pl.col('Pct_NS')-pl.col('DD_Score_Pct_NS_Max')).alias('EV_Par_Pct_Diff_NS'),
+                (pl.col('Pct_EW')-pl.col('DD_Score_Pct_EW_Max')).alias('EV_Par_Pct_Diff_EW'),
+                (pl.col('Pct_NS')-pl.col('EV_Pct_Max_NS')).alias('EV_Par_Pct_Max_Diff_NS'),
+                (pl.col('Pct_EW')-pl.col('EV_Pct_Max_EW')).alias('EV_Par_Pct_Max_Diff_EW'),
             ])
         ]
 
