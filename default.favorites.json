@@ -109,7 +109,7 @@
 				"prompts": [
 					{
 						"prompt": "Show board, contract, score, Par, pct, Par pct, sd pct, DD score, tricks, DD tricks. Boards_We_Played=True",
-						"sql": "SELECT Board, Contract, Score_{Pair_Direction}, Par_{Pair_Direction}, Pct_{Pair_Direction}, Par_Pct_{Pair_Direction}, EV_Pct_Max_{Pair_Direction}, DD_Score_{Pair_Direction}, Tricks, DD_Tricks, AVG(Pct_{Pair_Direction}) OVER (ORDER BY Board ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as Running_Avg_Pct FROM self WHERE Boards_We_Played = True ORDER BY Board"
+						"sql": "SELECT Board, PBN, Dealer, Vul, Contract, Score_{Pair_Direction}, Par_{Pair_Direction}, Pct_{Pair_Direction}, Par_Pct_{Pair_Direction}, EV_Pct_Max_{Pair_Direction}, DD_Score_{Pair_Direction}, Tricks, DD_Tricks, AVG(Pct_{Pair_Direction}) OVER (ORDER BY Board ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as Running_Avg_Pct FROM self WHERE Boards_We_Played = True ORDER BY Board"
 					}
 				]
 			},
