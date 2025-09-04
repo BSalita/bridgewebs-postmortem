@@ -1,14 +1,13 @@
 
 import logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO) # or DEBUG
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from mlBridgeLib.logging_config import setup_logger
+logger = setup_logger(__name__)
 def print_to_log_info(*args):
     print_to_log(logging.INFO, *args)
 def print_to_log_debug(*args):
     print_to_log(logging.DEBUG, *args)
 def print_to_log(level, *args):
-    logging.log(level, ' '.join(str(arg) for arg in args))
+    logger.log(level, ' '.join(str(arg) for arg in args))
 
 import pandas as pd
 import polars as pl
