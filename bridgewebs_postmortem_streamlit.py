@@ -5,6 +5,9 @@ PBN Results Calculator Streamlit Application
 # streamlit program to display Bridge game deal statistics from a PBN file.
 # Invoke from system prompt using: streamlit run CalculatePBNResults_Streamlit.py
 
+# todo:
+# before production, ask claude to look for bugs and concurrency issues.
+
 
 import streamlit as st
 import streamlit_chat
@@ -41,6 +44,22 @@ from mlBridgeLib.mlBridgeAugmentLib import (
 from mlBridgeBWLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
 
 
+def get_db_connection():
+    """Get or create a session-specific database connection.
+    
+    This ensures each Streamlit session has its own database connection,
+    preventing concurrency issues when multiple users access the app.
+    
+    Returns:
+        duckdb.DuckDBPyConnection: Session-specific database connection
+    """
+    if 'db_connection' not in st.session_state:
+        # Create a new connection for this session
+        st.session_state.db_connection = duckdb.connect()
+        print(f"Created new database connection for session")
+    return st.session_state.db_connection
+
+
 def ShowDataFrameTable(df, key, query='SELECT * FROM self', show_sql_query=True):
     with st.session_state.main_section_container.container():
         if show_sql_query and st.session_state.show_sql_query:
@@ -53,7 +72,8 @@ def ShowDataFrameTable(df, key, query='SELECT * FROM self', show_sql_query=True)
             query = 'FROM self ' + query
 
         try:
-            result_df = st.session_state.con.execute(query).pl()
+            con = get_db_connection()
+            result_df = con.execute(query).pl()
             if show_sql_query and st.session_state.show_sql_query:
                 st.text(f"Result is a dataframe of {len(result_df)} rows.")
             streamlitlib.ShowDataFrameTable(result_df, key) # requires pandas dataframe.
@@ -179,7 +199,10 @@ def player_selection_on_change():
                 st.session_state.df_unfiltered = df
                 st.session_state.session_id = parser_dfs[2]['results_session'].item()
                 st.session_state.group_id = parser_dfs[2]['club'].item()
-                st.session_state.con.register(st.session_state.con_register_name, df)
+                
+                # Register DataFrame with DuckDB
+                con = get_db_connection()
+                con.register(st.session_state.con_register_name, df)
 
         # --- END OF DEFERRED PROCESSING ---
         
@@ -228,7 +251,8 @@ def player_selection_on_change():
         
         st.session_state.df = df_filtered
         # Re-register the filtered dataframe for querying
-        st.session_state.con.register(st.session_state.con_register_name, st.session_state.df)
+        con = get_db_connection()
+        con.register(st.session_state.con_register_name, st.session_state.df)
 
         # Set ScorePercent based on pair direction
         score_col = f"ScorePercent_{st.session_state.pair_direction}"
@@ -650,7 +674,6 @@ class PBNResultsCalculator(PostmortemBase):
             'show_sql_query': True, # os.getenv('STREAMLIT_ENV') == 'development',
             'use_historical_data': False,
             'do_not_cache_df': True, # todo: set to True for production
-            'con': duckdb.connect(), # IMPORTANT: duckdb.connect() hung until previous version was installed.
             'con_register_name': 'self',
             'main_section_container': st.empty(),
             'app_datetime': datetime.fromtimestamp(pathlib.Path(__file__).stat().st_mtime, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z'),
