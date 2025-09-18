@@ -21,6 +21,7 @@ import json
 from collections import defaultdict
 from datetime import datetime, timezone
 import sys
+import os
 import platform
 from dotenv import load_dotenv
 import html
@@ -84,12 +85,12 @@ def ShowDataFrameTable(df, key, query='SELECT * FROM self', show_sql_query=True)
     return result_df
 
 
-def app_info():
-    st.caption(f"Project lead is Robert Salita research@AiPolice.org. Code written in Python. UI written in Streamlit. AI API is OpenAI. Data engine is Pandas. Query engine is Duckdb. Chat UI uses streamlit-chat. Self hosted using Cloudflare Tunnel. Repo:https://github.com/BSalita/BridgeWebs_Postmortem_Chatbot Bridge data scraped from public BridgeWeb webpages.")
-    # obsolete when chat was removed: Default AI model:{DEFAULT_AI_MODEL} OpenAI client:{openai.__version__} fastai:{fastai.__version__} safetensors:{safetensors.__version__} sklearn:{sklearn.__version__} torch:{torch.__version__} 
-    st.caption(
-        f"App:{st.session_state.app_datetime} Python:{'.'.join(map(str, sys.version_info[:3]))} Streamlit:{st.__version__} Pandas:{pd.__version__} duckdb:{duckdb.__version__} numpy:{np.__version__} polars:{pl.__version__} Query Params:{st.query_params.to_dict()}")
-
+def app_info() -> None:
+    """Display app information"""
+    st.caption(f"Project lead is Robert Salita research@AiPolice.org. Code written in Python. UI written in streamlit. Data engine is polars. Query engine is duckdb. Bridge lib is endplay. Self hosted using Cloudflare Tunnel. Repo:https://github.com/BSalita")
+    st.caption(f"App:{st.session_state.app_datetime} Streamlit:{st.__version__} Query Params:{st.query_params.to_dict()} Environment:{os.getenv('STREAMLIT_ENV','')}")
+    st.caption(f"Python:{'.'.join(map(str, sys.version_info[:3]))} pandas:{pd.__version__} polars:{pl.__version__} endplay:{endplay.__version__}")
+    return
 
 from fsspec.utils import infer_storage_options
 
@@ -632,33 +633,23 @@ class PBNResultsCalculator(PostmortemBase):
     # Override abstract methods
     def initialize_session_state(self):
         """Initialize app-specific session state."""
-
-        # todo: obsolete these in preference to 
-        # App-specific session state
-        if 'pbn_file' not in st.session_state:
-            st.session_state.pbn_file = None
-        if 'pbn_data' not in st.session_state:
-            st.session_state.pbn_data = None
-        if 'results' not in st.session_state:
-            st.session_state.results = None
-        if 'player_id' not in st.session_state:
-            st.session_state.player_id = None
-        if 'player_names' not in st.session_state:
-            st.session_state.player_names = None
-        if 'recommended_board_max' not in st.session_state:
-            st.session_state.recommended_board_max = 100
-        if 'save_intermediate_files' not in st.session_state:
-            st.session_state.save_intermediate_files = False
-
-        st.set_page_config(layout="wide")
-        # Add this auto-scroll code
-        streamlitlib.widen_scrollbars()
-
-        if platform.system() == 'Windows': # ugh. this hack is required because torch somehow remembers the platform where the model was created. Must be a bug. Must lie to torch.
-            pathlib.PosixPath = pathlib.WindowsPath
-        else:
-            pathlib.WindowsPath = pathlib.PosixPath
+        # First initialize common session state
+        self.initialize_common_session_state()
         
+        # BridgeWebs-specific session state
+        bridgewebs_specific_vars = {
+            'pbn_file': None,
+            'pbn_data': None,
+            'results': None,
+            'player_names': None,
+            'recommended_board_max': 100,
+            'save_intermediate_files': False,
+        }
+        
+        for key, value in bridgewebs_specific_vars.items():
+            if key not in st.session_state:
+                st.session_state[key] = value
+
         if 'player_id' in st.query_params:
             player_id = st.query_params['player_id']
             if not isinstance(player_id, str):
@@ -668,20 +659,6 @@ class PBNResultsCalculator(PostmortemBase):
         else:
             st.session_state.player_id = None
 
-        first_time_defaults = {
-            'first_time': True,
-            'single_dummy_sample_count': 10,
-            'show_sql_query': True, # os.getenv('STREAMLIT_ENV') == 'development',
-            'use_historical_data': False,
-            'do_not_cache_df': True, # todo: set to True for production
-            'con_register_name': 'self',
-            'main_section_container': st.empty(),
-            'app_datetime': datetime.fromtimestamp(pathlib.Path(__file__).stat().st_mtime, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z'),
-            'current_datetime': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        for key, value in first_time_defaults.items():
-            st.session_state[key] = value
-
         self.reset_game_data()
         self.initialize_website_specific()
         return
@@ -689,8 +666,9 @@ class PBNResultsCalculator(PostmortemBase):
 
     def reset_game_data(self):
         """Reset game data."""
-        # Implementation
-        reset_game_data()
+        # First reset common game data
+        self.reset_common_game_data()
+        # BridgeWebs-specific reset handled by global function for now
 
     def initialize_website_specific(self):
         """Initialize app-specific components."""
@@ -708,8 +686,8 @@ class PBNResultsCalculator(PostmortemBase):
     # Customize standard methods as needed
     def create_sidebar(self):
         """Create app-specific sidebar."""
-        # Call super method for standard elements
-        create_sidebar() # accessing the global function, not the class method.
+        # Call global function for BridgeWebs-specific sidebar
+        create_sidebar()
 
     def create_ui(self):
         """Creates the main UI structure with player selection prompts."""
@@ -773,12 +751,8 @@ class PBNResultsCalculator(PostmortemBase):
                 if st.button("Export as PDF"):
                     self.export_results(st.session_state.results, "pdf")
 
-    # todo: copied from acbl_postmortem_streamlit.py
     def write_report(self):
-        # bar_format='{l_bar}{bar}' isn't working in stqdm. no way to suppress r_bar without editing stqdm source code.
-        # todo: need to pass the Button title to the stqdm description. this is a hack until implemented.
-        st.session_state.main_section_container = st.container(border=True)
-        
+        """Use the standard report generation from base class with scroll to top."""
         # Scroll to top of the page before rendering the report
         st.markdown("""
             <script>
@@ -788,77 +762,14 @@ class PBNResultsCalculator(PostmortemBase):
             </script>
         """, unsafe_allow_html=True)
         
-        with st.session_state.main_section_container:
-            report_title = f"Bridge Game Postmortem Report Personalized for {st.session_state.player_name}" # can't use (st.session_state.player_id) because of href link below.
-            report_creator = f"Created by https://{st.session_state.game_name}.postmortem.chat"
-            report_event_info = f"Session: {st.session_state.event_title} {'' if st.session_state.event_title == st.session_state.session_id else f'(event id {st.session_state.session_id})'}"
-            report_game_results_webpage = f"Results Page: {st.session_state.game_results_url}"
-            report_your_match_info = f"Your pair was {st.session_state.pair_id}{st.session_state.pair_direction} {'' if st.session_state.section_name is None else 'in section '+st.session_state.section_name}. You played {st.session_state.player_direction}. Your partner was {st.session_state.partner_name} {'' if st.session_state.partner_name == st.session_state.partner_id else '('+st.session_state.partner_id+')'} who played {st.session_state.partner_direction}. Your pair scored {st.session_state.ScorePercent}%"
-            # Create a dummy anchor well above the title so title appears at top when scrolling
-            st.markdown('<div style="height: 50px;"><a name="top-of-report"></a></div>', unsafe_allow_html=True)
-            st.markdown(f"### {report_title}")
-            st.markdown(f"##### {report_creator}")
-            st.markdown(f"#### {report_event_info}")
-            st.markdown(f"##### {report_game_results_webpage}")
-            st.markdown(f"#### {report_your_match_info}")
-            pdf_assets = st.session_state.pdf_assets
-            pdf_assets.clear()
-            pdf_assets.append(f"# {report_title}")
-            pdf_assets.append(f"#### {report_creator}")
-            pdf_assets.append(f"### {report_event_info}")
-            pdf_assets.append(f"#### {report_game_results_webpage}")
-            pdf_assets.append(f"### {report_your_match_info}")
-            st.session_state.button_title = 'Summarize' # todo: generalize to all buttons!
-            selected_button = st.session_state.favorites['Buttons'][st.session_state.button_title]
-            vetted_prompts = st.session_state.favorites['SelectBoxes']['Vetted_Prompts']
-            sql_query_count = 0
-            for stats in stqdm(selected_button['prompts'], desc='Creating personalized report...'):
-                assert stats[0] == '@', stats
-                stat = vetted_prompts[stats[1:]]
-                for i, prompt in enumerate(stat['prompts']):
-                    if 'sql' in prompt and prompt['sql']:
-                        #print('sql:',prompt["sql"])
-                        if i == 0:
-                            streamlit_chat.message(f"Morty: {stat['help']}", key=f'morty_sql_query_{sql_query_count}', logo=st.session_state.assistant_logo)
-                            pdf_assets.append(f"### {stat['help']}")
-                        prompt_sql = prompt['sql']
-                        sql_query = self.process_prompt_macros(prompt_sql) # we want the default process_prompt_macros() to be used.
-                        query_df = ShowDataFrameTable(st.session_state.df, query=sql_query, key=f'sql_query_{sql_query_count}')
-                        if query_df is not None:
-                            pdf_assets.append(query_df)
-                        sql_query_count += 1
+        self.write_standard_report()
 
-            # Go to top button using simple anchor link (centered)
-            st.markdown('''
-                <div style="text-align: center; margin: 20px 0;">
-                    <a href="#top-of-report" style="text-decoration: none;">
-                        <button style="padding: 8px 16px; background-color: #ff4b4b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                            Go to top of report
-                        </button>
-                    </a>
-                </div>
-            ''', unsafe_allow_html=True)
-
-        if st.session_state.pdf_link.download_button(label="Download Personalized Report",
-                data=streamlitlib.create_pdf(st.session_state.pdf_assets, title=f"Bridge Game Postmortem Report Personalized for {st.session_state.player_id}"),
-                file_name = f"{st.session_state.session_id}-{st.session_state.player_id}-morty.pdf",
-                disabled = len(st.session_state.pdf_assets) == 0,
-                mime='application/octet-stream',
-                key='personalized_report_download_button'):
-            st.warning('Personalized report downloaded.')
-        return
-
-
-    # todo: copied from acbl_postmortem_streamlit.py
     def ask_sql_query(self):
-
-        if st.session_state.show_sql_query:
-            with st.container():
-                with bottom():
-                    st.chat_input('Enter a SQL query e.g. SELECT PBN, Contract, Result, N, S, E, W', key='main_prompt_chat_input_key', on_submit=chat_input_on_submit)
+        """Use the standard SQL query interface from base class."""
+        self.ask_standard_sql_query()
 
 
 if __name__ == "__main__":
-    if 'first_time' not in st.session_state: # todo: change to 'app' not in st.session_state
+    if 'app' not in st.session_state:
         st.session_state.app = PBNResultsCalculator()
     st.session_state.app.main() 
