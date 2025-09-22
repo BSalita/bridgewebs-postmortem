@@ -733,7 +733,7 @@ class PBNResultsCalculator(PostmortemBase):
         if st.session_state.pbn_data is not None:
             # Display PBN data
             st.header("PBN Data")
-            st.dataframe(st.session_state.pbn_data, use_container_width=True)
+            st.dataframe(st.session_state.pbn_data, width='stretch')
             
             # Calculate button
             if st.button("Calculate Results"):
