@@ -42,7 +42,7 @@ from mlBridgeLib.mlBridgePostmortemLib import PostmortemBase
 from mlBridgeLib.mlBridgeAugmentLib import (
     AllAugmentations,
 )
-from mlBridgeBWLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
+from mlBridgeLib.mlBridgeBWLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
 
 
 def get_db_connection():
