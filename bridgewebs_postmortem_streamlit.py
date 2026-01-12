@@ -38,11 +38,11 @@ sys.path.append(str(pathlib.Path.cwd().joinpath('streamlitlib')))  # global
 sys.path.append(str(pathlib.Path.cwd().joinpath('mlBridgeLib')))  # global # Requires "./mlBridgeLib" be in extraPaths in .vscode/settings.json
 
 import streamlitlib
-from mlBridgeLib.mlBridgePostmortemLib import PostmortemBase
-from mlBridgeLib.mlBridgeAugmentLib import (
+from mlBridge.mlBridgePostmortemLib import PostmortemBase
+from mlBridge.mlBridgeAugmentLib import (
     AllAugmentations,
 )
-from mlBridgeLib.mlBridgeBWLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
+from mlBridge.mlBridgeBWLib import BridgeWebResultsParser, read_pbn_file_from_url, merge_parsed_and_pbn_dfs
 
 
 def get_db_connection():
