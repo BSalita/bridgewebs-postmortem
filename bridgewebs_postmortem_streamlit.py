@@ -35,7 +35,7 @@ from endplay.parsers import pbn
 from endplay.types import Deal, Contract, Denom, Player, Penalty, Vul
 
 sys.path.append(str(pathlib.Path.cwd().joinpath('streamlitlib')))  # global
-#sys.path.append(str(pathlib.Path.cwd().joinpath('mlBridgeLib')))  # global # Requires "./mlBridgeLib" be in extraPaths in .vscode/settings.json
+#sys.path.append(str(pathlib.Path.cwd().joinpath('mlBridge')))  # global # Requires "./mlBridgeLib" be in extraPaths in .vscode/settings.json
 
 import streamlitlib
 from mlBridge.mlBridgePostmortemLib import PostmortemBase
