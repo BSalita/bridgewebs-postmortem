@@ -39,7 +39,7 @@ pathlib
 scikit-learn
 matplotlib
 IPython
-streamlit-aggrid
+streamlit-aggrid==1.1.8.post1
 seaborn
 
 # for acbllib
