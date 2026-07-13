@@ -373,6 +373,7 @@ def filter_dataframe(df, pair_direction, pair_number, player_direction, player_i
 
 def create_sidebar():
     st.sidebar.caption('Build:'+st.session_state.app_datetime)
+    streamlitlib.render_memory_sidebar_caption(st)
 
     # example valid urls
     #default_url = 'https://raw.githubusercontent.com/BSalita/Calculate_PBN_Results/master/DDS_Camrose24_1-%20BENCAM22%20v%20WBridge5.pbn'

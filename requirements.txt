@@ -31,6 +31,7 @@ torchaudio
 reportlab
 markdown
 aiohttp
+psutil
 
 
 # for mlBridgeLib
