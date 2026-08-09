@@ -35,19 +35,26 @@ from endplay.parsers import pbn
 from endplay.types import Deal, Contract, Denom, Player, Penalty, Vul
 
 _APP_DIR = pathlib.Path(__file__).resolve().parent
-_SRC_DIR = _APP_DIR.parent
 _REQUIRED_LIBS = ('mlBridge', 'streamlitlib')
+
+def _is_lib_dir(path: pathlib.Path) -> bool:
+    return path.is_dir() and (path / '__init__.py').is_file()
+
 _resolved_libs = []
 for _name in _REQUIRED_LIBS:
-    _local, _sibling = _APP_DIR / _name, _SRC_DIR / _name
-    if _local.is_dir():
-        _resolved_libs.append(_local)
-    elif _sibling.is_dir():
-        _resolved_libs.append(_sibling)
-    else:
-        raise FileNotFoundError(f"{_name} not found at {_local} or {_sibling}")
+    _candidates = (
+        _APP_DIR / _name,
+        _APP_DIR.parent / _name,
+        _APP_DIR.parent.parent / _name,
+    )
+    _found = next((path for path in _candidates if _is_lib_dir(path)), None)
+    if _found is None:
+        raise FileNotFoundError(
+            f"{_name} not found at " + " or ".join(str(path) for path in _candidates)
+        )
+    _resolved_libs.append(_found)
 # Package root for import mlBridge.*; lib dirs first for legacy import streamlitlib/acbllib.
-for _p in (_SRC_DIR, _APP_DIR):
+for _p in {_APP_DIR, *(path.parent for path in _resolved_libs)}:
     _s = str(_p)
     if _s not in sys.path:
         sys.path.append(_s)
