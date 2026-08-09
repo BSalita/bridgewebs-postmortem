@@ -1,4 +1,4 @@
-import pathlib
+﻿import pathlib
 import requests
 import sys
 import polars as pl
@@ -12,9 +12,31 @@ from urllib.parse import urlparse, parse_qs
 # from endplay.dealer import generate_deals
 
 _APP_DIR = pathlib.Path(__file__).resolve().parent
-for _p in (_APP_DIR, _APP_DIR / 'mlBridge', _APP_DIR / 'streamlitlib'):
-    if _p.is_dir() and str(_p) not in sys.path:
-        sys.path.append(str(_p))
+_SRC_DIR = _APP_DIR.parent
+_REQUIRED_LIBS = ('mlBridge', 'streamlitlib')
+_resolved_libs = []
+for _name in _REQUIRED_LIBS:
+    _local, _sibling = _APP_DIR / _name, _SRC_DIR / _name
+    if _local.is_dir():
+        _resolved_libs.append(_local)
+    elif _sibling.is_dir():
+        _resolved_libs.append(_sibling)
+    else:
+        raise FileNotFoundError(f"{_name} not found at {_local} or {_sibling}")
+# Package root for import mlBridge.*; lib dirs first for legacy import streamlitlib/acbllib.
+for _p in (_SRC_DIR, _APP_DIR):
+    _s = str(_p)
+    if _s not in sys.path:
+        sys.path.append(_s)
+for _p in _resolved_libs:
+    _s = str(_p)
+    if _p.name == 'mlBridge':
+        if _s not in sys.path:
+            sys.path.append(_s)  # logging_config and friends
+    else:
+        if _s in sys.path:
+            sys.path.remove(_s)
+        sys.path.insert(0, _s)
 
 from mlBridge import mlBridgeEndplayLib
 from mlBridge.mlBridgeAugmentLib import (
