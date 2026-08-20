@@ -231,6 +231,7 @@ def player_selection_on_change():
                 st.session_state.df_unfiltered = df
                 st.session_state.session_id = parser_dfs[2]['results_session'].item()
                 st.session_state.group_id = parser_dfs[2]['club'].item()
+                save_augmented_df_to_cache(df, st.session_state.group_id, st.session_state.session_id)
                 
                 # Register DataFrame with DuckDB
                 con = get_db_connection()
@@ -303,6 +304,27 @@ def player_selection_on_change():
     #         # Clear the problematic player selection
     #         if 'selected_player_key' in st.session_state:
     #             st.session_state.selected_player_key = None
+
+
+def save_augmented_df_to_cache(df, club, session_id):
+    """Persist the augmented UNFILTERED dataframe for headless consumers
+    (bridgewebs_postmortem_mcp_server.py), using cache/df-{club}-{session}.parquet.
+    Tokens are sanitized to be dash-free so the filename parses unambiguously.
+    The unfiltered frame is saved because player selection happens later; the
+    MCP service re-derives the per-player flags by player name (same logic as
+    filter_dataframe below). Write-only by design: the live app always
+    recomputes."""
+    import re
+    try:
+        cache_dir = pathlib.Path('cache')
+        cache_dir.mkdir(exist_ok=True)
+        club_token = re.sub(r'[^A-Za-z0-9_.]+', '_', str(club)) or 'unknown'
+        session_token = re.sub(r'[^A-Za-z0-9_.]+', '_', str(session_id)) or 'unknown'
+        cache_file = cache_dir / f'df-{club_token}-{session_token}.parquet'
+        df.write_parquet(cache_file)
+        print(f"Saved postmortem cache {cache_file}: shape:{df.shape} size:{cache_file.stat().st_size}")
+    except Exception as e:
+        print(f"Unable to save postmortem cache for {club}-{session_id}: {e}")
 
 
 def change_game_state():
@@ -480,10 +502,10 @@ def create_sidebar():
     # Automated Postmortem Apps
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Automated Postmortem Apps**")
-    st.sidebar.markdown("ðŸ”— [ACBL Postmortem](https://acbl.postmortem.chat)")
-    st.sidebar.markdown("ðŸ”— [French ffbridge Postmortem](https://ffbridge.postmortem.chat)")
-    st.sidebar.markdown("ðŸ”— [Calculate PBN](https://pbn.postmortem.chat)")
-    #st.sidebar.markdown("ðŸ”— [BridgeWebs Postmortem](https://bridgewebs.postmortem.chat)")
+    st.sidebar.markdown("🔗 [ACBL Postmortem](https://acbl.postmortem.chat)")
+    st.sidebar.markdown("🔗 [French ffbridge Postmortem](https://ffbridge.postmortem.chat)")
+    st.sidebar.markdown("🔗 [Calculate PBN](https://pbn.postmortem.chat)")
+    #st.sidebar.markdown("🔗 [BridgeWebs Postmortem](https://bridgewebs.postmortem.chat)")
     
     return
 
@@ -615,8 +637,8 @@ def reset_game_data():
 
 def initialize_website_specific():
 
-    st.session_state.assistant_logo = 'https://github.com/BSalita/Bridge_Game_Postmortem_Chatbot/blob/master/assets/logo_assistant.gif?raw=true' # ðŸ¥¸ todo: put into config. must have raw=true for github url.
-    st.session_state.guru_logo = 'https://github.com/BSalita/Bridge_Game_Postmortem_Chatbot/blob/master/assets/logo_guru.png?raw=true' # ðŸ¥·todo: put into config file. must have raw=true for github url.
+    st.session_state.assistant_logo = 'https://github.com/BSalita/Bridge_Game_Postmortem_Chatbot/blob/master/assets/logo_assistant.gif?raw=true' # 🥸 todo: put into config. must have raw=true for github url.
+    st.session_state.guru_logo = 'https://github.com/BSalita/Bridge_Game_Postmortem_Chatbot/blob/master/assets/logo_guru.png?raw=true' # 🥷todo: put into config file. must have raw=true for github url.
     st.session_state.game_results_url_default = None
     st.session_state.game_name = 'bridgewebs'
     st.session_state.game_results_url = st.session_state.game_results_url_default
