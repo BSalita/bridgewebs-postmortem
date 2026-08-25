@@ -18,6 +18,8 @@ import os
 import pathlib
 import re
 import threading
+import unicodedata
+from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Tuple
 
 import duckdb
@@ -52,6 +54,26 @@ BOARD_SUMMARY_COLUMNS = [
 ]
 
 
+def _normalize_text(value: object) -> str:
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(character for character in text if not unicodedata.combining(character))
+    return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+
+
+def _fuzzy_score(candidate: object, query: object) -> float:
+    haystack = _normalize_text(candidate)
+    needle = _normalize_text(query)
+    if not haystack or not needle:
+        return 0.0
+    if needle in haystack:
+        return 1.0
+    return SequenceMatcher(None, needle, haystack).ratio()
+
+
+def _fuzzy_matches(candidate: object, query: object, threshold: float = 0.72) -> bool:
+    return _fuzzy_score(candidate, query) >= threshold
+
+
 def _parse_cache_filename(name: str) -> Optional[Dict[str, str]]:
     m = _CACHE_FILE_RE.match(name)
     if m is None:
@@ -68,7 +90,7 @@ def list_cached_postmortems(club: Optional[str] = None) -> List[Dict[str, Any]]:
         parsed = _parse_cache_filename(f.name)
         if parsed is None:
             continue
-        if club is not None and parsed["club"] != str(club):
+        if club is not None and not _fuzzy_matches(parsed["club"], club):
             continue
         stat = f.stat()
         out.append(
@@ -154,8 +176,18 @@ def player_names(df: pl.DataFrame) -> List[str]:
 
 def personalize(df: pl.DataFrame, player_name: str) -> Tuple[pl.DataFrame, Dict[str, Any]]:
     """Add the player-centric flag columns exactly as filter_dataframe in the
-    app does, locating the player by name (case-insensitive exact match)."""
-    name = str(player_name).strip()
+    app does, resolving the player name with typo-tolerant matching."""
+    requested_name = str(player_name).strip()
+    names = player_names(df)
+    ranked = sorted(
+        ((_fuzzy_score(name, requested_name), name) for name in names),
+        reverse=True,
+    )
+    if not ranked or ranked[0][0] < 0.72:
+        raise ValueError(
+            f"No player name fuzzy match for {requested_name!r}; available: {names}"
+        )
+    name = ranked[0][1]
     for player_direction, partner_direction, pair_direction, opponent_pair_direction in _SEAT_TUPLES:
         col = f"Player_Name_{player_direction}"
         if col not in df.columns:
@@ -181,6 +213,7 @@ def personalize(df: pl.DataFrame, player_name: str) -> Tuple[pl.DataFrame, Dict[
             (pl.col("Boards_I_Played") & ~pl.col("Boards_We_Declared") & pl.col("Contract").ne("PASS")).alias("Boards_Opponent_Declared"),
         )
         meta = {
+            "requested_player_name": requested_name,
             "player_name": rows[col][0],
             "player_direction": player_direction,
             "partner_name": partner_name,
