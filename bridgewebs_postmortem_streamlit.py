@@ -307,8 +307,8 @@ def player_selection_on_change():
 
 
 def save_augmented_df_to_cache(df, club, session_id):
-    """Persist the augmented UNFILTERED dataframe for headless consumers
-    (bridgewebs_postmortem_mcp_server.py), using cache/df-{club}-{session}.parquet.
+    """Persist the augmented UNFILTERED dataframe for MortyBridgeBot,
+    using cache/df-{club}-{session}.parquet.
     Tokens are sanitized to be dash-free so the filename parses unambiguously.
     The unfiltered frame is saved because player selection happens later; the
     MCP service re-derives the per-player flags by player name (same logic as

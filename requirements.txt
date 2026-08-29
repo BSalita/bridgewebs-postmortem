@@ -26,9 +26,6 @@ torch
 torchvision
 torchaudio
 
-# MCP server (bridgewebs_postmortem_mcp_server.py, streamable HTTP transport)
-mcp
-
 # for streamlitlib
 reportlab
 markdown

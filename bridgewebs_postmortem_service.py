@@ -4,7 +4,7 @@ The Streamlit app (bridgewebs_postmortem_streamlit.py) persists each fully
 augmented UNFILTERED board-results dataframe to
 cache/df-{club}-{session}.parquet right after augmentation (see
 save_augmented_df_to_cache). This module is the shared, Streamlit-free core
-used by bridgewebs_postmortem_mcp_server.py: it enumerates those parquets,
+exposed through MortyBridgeBot: it enumerates those parquets,
 re-derives the per-player flag columns by player NAME (BridgeWebs has no
 player ids; same logic as filter_dataframe in the app, driven by the
 Player_Name_[NESW] and PairId_NS/EW columns), and runs DuckDB SQL against the
