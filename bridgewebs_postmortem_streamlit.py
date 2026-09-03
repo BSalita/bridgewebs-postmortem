@@ -1,4 +1,4 @@
-﻿"""
+"""
 PBN Results Calculator Streamlit Application
 """
 
