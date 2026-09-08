@@ -473,9 +473,21 @@ def create_sidebar():
         if 'game_results_url' in st.session_state and st.session_state.game_results_url:
             st.sidebar.markdown(f"**[Results Page]({st.session_state.game_results_url})**")
 
+    name_filter = st.sidebar.text_input(
+        "Filter by player name",
+        key="player_name_filter",
+        placeholder="Fuzzy name match...",
+        help="Case-insensitive fuzzy match. Accents and small typos are OK.",
+    )
+    player_options = streamlitlib.filter_name_list(
+        st.session_state.player_names, name_filter
+    )
+    if (name_filter or "").strip() and not player_options:
+        st.sidebar.warning(f"No players match '{name_filter.strip()}'.")
+        player_options = st.session_state.player_names
     st.sidebar.selectbox(
         'Select Player for Postmortem:',
-        options=st.session_state.player_names,
+        options=player_options,
         index=None,
         key='selected_player_key',
         on_change=player_selection_on_change,
