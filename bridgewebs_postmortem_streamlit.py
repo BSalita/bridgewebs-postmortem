@@ -485,14 +485,25 @@ def create_sidebar():
     if (name_filter or "").strip() and not player_options:
         st.sidebar.warning(f"No players match '{name_filter.strip()}'.")
         player_options = st.session_state.player_names
-    st.sidebar.selectbox(
-        'Select Player for Postmortem:',
-        options=player_options,
-        index=None,
-        key='selected_player_key',
-        on_change=player_selection_on_change,
-        placeholder="Select a player"
-    )
+    if (name_filter or "").strip() and len(player_options) == 1:
+        only_player = player_options[0]
+        already = (
+            st.session_state.get("selected_player_key") == only_player
+            and st.session_state.get("session_id") is not None
+        )
+        if not already:
+            st.session_state.selected_player_key = only_player
+            player_selection_on_change()
+        st.sidebar.caption(f"Matched {only_player}. Generating report.")
+    else:
+        st.sidebar.selectbox(
+            'Select Player for Postmortem:',
+            options=player_options,
+            index=None,
+            key='selected_player_key',
+            on_change=player_selection_on_change,
+            placeholder="Select a player"
+        )
 
     st.session_state.pdf_link = st.sidebar.empty()
 
@@ -850,6 +861,7 @@ class PBNResultsCalculator(PostmortemBase):
 
 
 if __name__ == "__main__":
+    st.set_page_config(layout="wide", initial_sidebar_state="expanded")
     if 'app' not in st.session_state:
         st.session_state.app = PBNResultsCalculator()
     st.session_state.app.main() 
