@@ -527,13 +527,16 @@ def create_sidebar():
         }
         st.json(params)
 
-    # Automated Postmortem Apps
+    # Other Morty websites
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**Automated Postmortem Apps**")
+    st.sidebar.markdown("**Other Morty websites**")
+    st.sidebar.markdown("🔗 [ACBL Elo Ratings](https://acbl-elo.7nt.info)")
     st.sidebar.markdown("🔗 [ACBL Postmortem](https://acbl.postmortem.chat)")
-    st.sidebar.markdown("🔗 [French ffbridge Postmortem](https://ffbridge.postmortem.chat)")
-    st.sidebar.markdown("🔗 [Calculate PBN](https://pbn.postmortem.chat)")
-    #st.sidebar.markdown("🔗 [BridgeWebs Postmortem](https://bridgewebs.postmortem.chat)")
+    st.sidebar.markdown("🔗 [ACBL Statistics](https://acbl-stats.7nt.info)")
+    st.sidebar.markdown("🔗 [FFBridge Elo Ratings](https://ffbridge-elo.7nt.info)")
+    st.sidebar.markdown("🔗 [FFBridge Postmortem](https://ffbridge.postmortem.chat)")
+    st.sidebar.markdown("🔗 [FFBridge Statistics](https://ffbridge-stats.7nt.info)")
+    st.sidebar.markdown("🔗 [PBN/LIN Postmortem](https://pbn.postmortem.chat)")
     
     return
 
