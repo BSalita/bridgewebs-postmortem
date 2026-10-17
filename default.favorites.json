@@ -127,7 +127,7 @@
 			"Our_Best_Boards": {
 				"title": "Best boards",
 				"row_click": "Show every score on board {Board}.",
-				"help": "**Showing {player1_name}'s best boards.**",
+				"help": "**Showing our partnership's best boards.**",
 				"prompts": [
 					{
 						"prompt": "Show board, pct, contract, score, Par, Par pct, sd pct. Show those boards I played and pct > .7. Sort by pct descending.",
@@ -144,7 +144,7 @@
 			"Our_Worst_Boards": {
 				"title": "Worst boards",
 				"row_click": "Show every score on board {Board}.",
-				"help": "**Showing {player1_name}'s worst boards.**",
+				"help": "**Showing our partnership's worst boards.**",
 				"prompts": [
 					{
 						"prompt": "Show board, pct, contract, score, Par, Par pct, sd pct. Show those boards I played and pct < .3. Sort by pct ascending.",
