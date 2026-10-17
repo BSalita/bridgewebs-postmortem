@@ -474,18 +474,20 @@ def create_sidebar():
             st.sidebar.markdown(f"**[Results Page]({st.session_state.game_results_url})**")
 
     name_filter = st.sidebar.text_input(
-        "Filter by player name",
+        "Player name",
         key="player_name_filter",
         placeholder="Fuzzy name match...",
         help="Case-insensitive fuzzy match. Accents and small typos are OK.",
     )
-    player_options = streamlitlib.filter_name_list(
-        st.session_state.player_names, name_filter
+    query = (name_filter or "").strip()
+    player_options = (
+        streamlitlib.filter_name_list(st.session_state.player_names, query)
+        if query
+        else []
     )
-    if (name_filter or "").strip() and not player_options:
-        st.sidebar.warning(f"No players match '{name_filter.strip()}'.")
-        player_options = st.session_state.player_names
-    if (name_filter or "").strip() and len(player_options) == 1:
+    if query and not player_options:
+        st.sidebar.warning(f"No players match '{query}'.")
+    elif query and len(player_options) == 1:
         only_player = player_options[0]
         already = (
             st.session_state.get("selected_player_key") == only_player
@@ -495,14 +497,16 @@ def create_sidebar():
             st.session_state.selected_player_key = only_player
             player_selection_on_change()
         st.sidebar.caption(f"Matched {only_player}. Generating report.")
-    else:
+    elif query and len(player_options) > 1:
+        if st.session_state.get("selected_player_key") not in player_options:
+            st.session_state.selected_player_key = None
         st.sidebar.selectbox(
-            'Select Player for Postmortem:',
+            f"Matching players ({len(player_options)})",
             options=player_options,
             index=None,
             key='selected_player_key',
             on_change=player_selection_on_change,
-            placeholder="Select a player"
+            placeholder="Select the player",
         )
 
     st.session_state.pdf_link = st.sidebar.empty()
@@ -797,7 +801,7 @@ class PBNResultsCalculator(PostmortemBase):
                 with st.session_state.main_section_container.container():
                     import streamlit_chat
                     streamlit_chat.message(
-                        "Please select the player name from Player for Postmortem selection box in the left sidebar. It will be used to generate a personalized postmortem report.",
+                        "Enter a player name in the left sidebar. If several people match, pick one from the list under the name box.",
                         key='morty_select_player_prompt',
                         logo=st.session_state.assistant_logo
                     )
