@@ -553,6 +553,7 @@ def create_sidebar():
     # Other Morty websites
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Other Morty websites**")
+    st.sidebar.markdown("🔗 [Bridge Chatbot](https://chat.7nt.info)")
     st.sidebar.markdown("🔗 [ACBL Elo Ratings](https://acbl-elo.7nt.info)")
     st.sidebar.markdown("🔗 [ACBL Postmortem](https://acbl.postmortem.chat)")
     st.sidebar.markdown("🔗 [ACBL Statistics](https://acbl-stats.7nt.info)")
