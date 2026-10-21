@@ -318,7 +318,7 @@
 							{"Rank Pairs by Par Success": "@Par_Rankings"},
 							{"Pct per Round": "@Pct_Per_Round"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, ' - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, AVG(CASE WHEN Score_NS <= Par_NS OR Score_NS <= EV_Max_NS THEN Pct_NS ELSE NULL END) AS Avg_Pct_NS, COUNT(CASE WHEN Score_NS <= Par_NS OR Score_NS <= EV_Max_NS THEN 1 ELSE NULL END) AS Board_Count, STRING_AGG(CASE WHEN Score_NS > Par_NS AND Score_NS > EV_Max_NS THEN Board END, ', ') AS Gifted_Boards_Removed FROM self GROUP BY Pair_NS ORDER BY Avg_Pct_NS DESC, Board_Count DESC"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, '-NS - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, AVG(CASE WHEN Score_NS <= Par_NS OR Score_NS <= EV_Max_NS THEN Pct_NS ELSE NULL END) AS Avg_Pct_NS, COUNT(CASE WHEN Score_NS <= Par_NS OR Score_NS <= EV_Max_NS THEN 1 ELSE NULL END) AS Board_Count, STRING_AGG(CASE WHEN Score_NS > Par_NS AND Score_NS > EV_Max_NS THEN Board END, ', ') AS Gifted_Boards_Removed FROM self GROUP BY Pair_NS ORDER BY Avg_Pct_NS DESC, Board_Count DESC"
 					},
 					{
 						"prompt": "",
@@ -327,7 +327,7 @@
 							{"Rank Pairs by Par Success": "@Par_Rankings"},
 							{"Pct per Round": "@Pct_Per_Round"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_EW, ' - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, AVG(CASE WHEN Score_EW <= Par_EW OR Score_EW <= EV_Max_EW THEN Pct_EW ELSE NULL END) AS Avg_Pct_EW, COUNT(CASE WHEN Score_EW <= Par_EW OR Score_EW <= EV_Max_EW THEN 1 ELSE NULL END) AS Board_Count, STRING_AGG(CASE WHEN Score_EW > Par_EW AND Score_EW > EV_Max_EW THEN Board END, ', ') AS Gifted_Boards_Removed FROM self GROUP BY Pair_EW ORDER BY Avg_Pct_EW DESC, Board_Count DESC"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_EW, '-EW - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, AVG(CASE WHEN Score_EW <= Par_EW OR Score_EW <= EV_Max_EW THEN Pct_EW ELSE NULL END) AS Avg_Pct_EW, COUNT(CASE WHEN Score_EW <= Par_EW OR Score_EW <= EV_Max_EW THEN 1 ELSE NULL END) AS Board_Count, STRING_AGG(CASE WHEN Score_EW > Par_EW AND Score_EW > EV_Max_EW THEN Board END, ', ') AS Gifted_Boards_Removed FROM self GROUP BY Pair_EW ORDER BY Avg_Pct_EW DESC, Board_Count DESC"
 					}
 				]
 			},
@@ -614,7 +614,7 @@
 							{"Boards Your Partnership Played": "@Boards_We_Played"},
 							{"Rank Pairs by Par Success": "@Par_Rankings"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_{Opponent_Pair_Direction}, ' - ', (SELECT STRING_AGG(value.unnest, ' - ') FROM UNNEST(Pair_Names_{Opponent_Pair_Direction}) as value)) as Opponents, AVG(Pct_{Pair_Direction}) AS Avg_Pct_{Pair_Direction}, STRING_AGG(Board, ', ') AS Boards, STRING_AGG(ROUND(Pct_{Pair_Direction},2), ', ') AS Pcts_{Pair_Direction} FROM self WHERE Boards_We_Played = True GROUP BY section_name, Pair_Number_{Opponent_Pair_Direction}, Pair_Names_{Opponent_Pair_Direction} ORDER BY section_name, Pair_Number_{Opponent_Pair_Direction}"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_{Opponent_Pair_Direction}, '-{Opponent_Pair_Direction} - ', (SELECT STRING_AGG(value.unnest, ' - ') FROM UNNEST(Pair_Names_{Opponent_Pair_Direction}) as value)) as Opponents, AVG(Pct_{Pair_Direction}) AS Avg_Pct_{Pair_Direction}, STRING_AGG(Board, ', ') AS Boards, STRING_AGG(ROUND(Pct_{Pair_Direction},2), ', ') AS Pcts_{Pair_Direction} FROM self WHERE Boards_We_Played = True GROUP BY section_name, Pair_Number_{Opponent_Pair_Direction}, Pair_Names_{Opponent_Pair_Direction} ORDER BY section_name, Pair_Number_{Opponent_Pair_Direction}"
 					}
 				]
 			},
@@ -677,7 +677,7 @@
 							{"Rank Declarers by Pct": "@Declarer_Rankings"},
 							{"Boards I beat Par": "@Boards_We_Beat_Par"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, ' - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, COUNT(CASE WHEN Score_NS>=Par_NS THEN 1 ELSE NULL END) AS Count_GE, AVG(Pct_NS) AS Pct, STRING_AGG(CASE WHEN Score_NS>Par_NS THEN Board END, ', ') AS Boards_GT, STRING_AGG(CASE WHEN Score_NS=Par_NS THEN Board END, ', ') AS Boards_EQ, STRING_AGG(CASE WHEN Score_NS < Par_NS THEN Board END, ', ') AS Boards_LT, COUNT(CASE WHEN Score_NS=Par_NS THEN 1 ELSE NULL END) AS Count_EQ FROM self GROUP BY Pair_NS ORDER BY Count_GE DESC, Count_EQ"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, '-NS - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, COUNT(CASE WHEN Score_NS>=Par_NS THEN 1 ELSE NULL END) AS Count_GE, AVG(Pct_NS) AS Pct, STRING_AGG(CASE WHEN Score_NS>Par_NS THEN Board END, ', ') AS Boards_GT, STRING_AGG(CASE WHEN Score_NS=Par_NS THEN Board END, ', ') AS Boards_EQ, STRING_AGG(CASE WHEN Score_NS < Par_NS THEN Board END, ', ') AS Boards_LT, COUNT(CASE WHEN Score_NS=Par_NS THEN 1 ELSE NULL END) AS Count_EQ FROM self GROUP BY Pair_NS ORDER BY Count_GE DESC, Count_EQ"
 					},
 					{
 						"prompt": "",
@@ -685,7 +685,7 @@
 							{"Rank Declarers by Pct": "@Declarer_Rankings"},
 							{"Boards I beat Par": "@Boards_We_Beat_Par"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_EW, ' - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, COUNT(CASE WHEN Score_EW>=Par_EW THEN 1 ELSE NULL END) AS Count_GE, AVG(Pct_EW) AS Pct, STRING_AGG(CASE WHEN Score_EW>Par_EW THEN Board END, ', ') AS Boards_GT, STRING_AGG(CASE WHEN Score_EW=Par_EW THEN Board END, ', ') AS Boards_EQ, STRING_AGG(CASE WHEN Score_EW < Par_EW THEN Board END, ', ') AS Boards_LT, COUNT(CASE WHEN Score_EW=Par_EW THEN 1 ELSE NULL END) AS Count_EQ FROM self GROUP BY Pair_EW ORDER BY Count_GE DESC, Count_EQ"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_EW, '-EW - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, COUNT(CASE WHEN Score_EW>=Par_EW THEN 1 ELSE NULL END) AS Count_GE, AVG(Pct_EW) AS Pct, STRING_AGG(CASE WHEN Score_EW>Par_EW THEN Board END, ', ') AS Boards_GT, STRING_AGG(CASE WHEN Score_EW=Par_EW THEN Board END, ', ') AS Boards_EQ, STRING_AGG(CASE WHEN Score_EW < Par_EW THEN Board END, ', ') AS Boards_LT, COUNT(CASE WHEN Score_EW=Par_EW THEN 1 ELSE NULL END) AS Count_EQ FROM self GROUP BY Pair_EW ORDER BY Count_GE DESC, Count_EQ"
 					}
 				]
 			},
@@ -714,7 +714,7 @@
 							{"Boards Your Partnership Played": "@Boards_We_Played"},
 							{"Our Mistakes": "@Our_Mistakes"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, ' - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, CONCAT(section_name, Pair_Number_EW, ' - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, Board, Contract, Score_Declarer, Computed_Score_Declarer, Score_NS, Score_EW, Result FROM self WHERE Contract IS NULL OR Score_Declarer IS NULL OR Score_Declarer <> Computed_Score_Declarer OR Score_NS <> -Score_EW ORDER BY Board"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, '-NS - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, CONCAT(section_name, Pair_Number_EW, '-EW - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, Board, Contract, Score_Declarer, Computed_Score_Declarer, Score_NS, Score_EW, Result FROM self WHERE Contract IS NULL OR Score_Declarer IS NULL OR Score_Declarer <> Computed_Score_Declarer OR Score_NS <> -Score_EW ORDER BY Board"
 					}
 				]
 			},
@@ -728,7 +728,7 @@
 							{"Board Results Predictions": "@Board_Results_Predictions"},
 							{"Declarer Direction Predictions": "@Declarer_Direction_Predictions"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, ' - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, AVG(Pct_NS_Actual) AS Avg_Pct_NS_Actual, AVG(Pct_NS_Pred) AS Avg_Pct_NS_Pred, AVG(Pct_NS_Diff) AS Avg_Pct_NS_Diff FROM self GROUP BY Pair_NS ORDER BY Avg_Pct_NS_Actual DESC"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, '-NS - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, AVG(Pct_NS_Actual) AS Avg_Pct_NS_Actual, AVG(Pct_NS_Pred) AS Avg_Pct_NS_Pred, AVG(Pct_NS_Diff) AS Avg_Pct_NS_Diff FROM self GROUP BY Pair_NS ORDER BY Avg_Pct_NS_Actual DESC"
 					},
 					{
 						"prompt": "",
@@ -736,7 +736,7 @@
 							{"Board Results Predictions": "@Board_Results_Predictions"},
 							{"Declarer Direction Predictions": "@Declarer_Direction_Predictions"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_EW, ' - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, AVG(Pct_EW_Actual) AS Avg_Pct_EW_Actual, AVG(Pct_EW_Pred) AS Avg_Pct_EW_Pred, AVG(Pct_EW_Diff) AS Avg_Pct_EW_Diff FROM self GROUP BY Pair_EW ORDER BY Avg_Pct_EW_Actual DESC"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_EW, '-EW - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, AVG(Pct_EW_Actual) AS Avg_Pct_EW_Actual, AVG(Pct_EW_Pred) AS Avg_Pct_EW_Pred, AVG(Pct_EW_Diff) AS Avg_Pct_EW_Diff FROM self GROUP BY Pair_EW ORDER BY Avg_Pct_EW_Actual DESC"
 					}
 				]
 			},
@@ -750,7 +750,7 @@
 							{"Board Results Predictions for Boards We Played": "@Board_Results_Predictions_Boards_We_Played"},
 							{"Contract Predictions Statistics Per Table": "@Contract_Predictions_Statistics_By_Board"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, ' - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, Board, Contract, Score_NS, Pct_NS_Actual, Pct_NS_Pred, Pct_NS_Diff, Declarer_Direction_Pred, Pair_Number_NS, Pair_Number_EW FROM self ORDER BY Board, Pair_NS"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_NS, '-NS - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, Board, Contract, Score_NS, Pct_NS_Actual, Pct_NS_Pred, Pct_NS_Diff, Declarer_Direction_Pred, Pair_Number_NS, Pair_Number_EW FROM self ORDER BY Board, Pair_NS"
 					},
 					{
 						"prompt": "",
@@ -758,7 +758,7 @@
 							{"Board Results Predictions for Boards We Played": "@Board_Results_Predictions_Boards_We_Played"},
 							{"Contract Predictions Statistics Per Table": "@Contract_Predictions_Statistics_By_Board"}
 						],
-						"sql": "SELECT CONCAT(section_name, Pair_Number_EW, ' - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, Board, Contract, Score_EW, Pct_EW_Actual, Pct_EW_Pred, Pct_EW_Diff, Declarer_Direction_Pred, Pair_Number_NS, Pair_Number_EW FROM self ORDER BY Board, Pair_EW"
+						"sql": "SELECT CONCAT(section_name, Pair_Number_EW, '-EW - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW, Board, Contract, Score_EW, Pct_EW_Actual, Pct_EW_Pred, Pct_EW_Diff, Declarer_Direction_Pred, Pair_Number_NS, Pair_Number_EW FROM self ORDER BY Board, Pair_EW"
 					}
 				]
 			},
@@ -788,7 +788,7 @@
 							{"Declarer Direction Predictions Statistics Per Board": "@Declarer_Direction_Predictions_Statistics_By_Board"},
 							{"Declarer Direction Predictions Statistics Per Actual Declarer": "@Declarer_Direction_Predictions_Statistics_By_Actual_Declarer"}
 						],
-						"sql": "SELECT Board, Declarer_Direction_Pred AS Pred, Contract, Result, Score_NS, Par_NS, MP_NS, CONCAT(section_name, Pair_Number_NS, ' - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, CONCAT(section_name, Pair_Number_EW, ' - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW FROM self ORDER BY Board, MP_NS DESC"
+						"sql": "SELECT Board, Declarer_Direction_Pred AS Pred, Contract, Result, Score_NS, Par_NS, MP_NS, CONCAT(section_name, Pair_Number_NS, '-NS - ', Player_Name_N, ' - ', Player_Name_S) AS Pair_NS, CONCAT(section_name, Pair_Number_EW, '-EW - ', Player_Name_E, ' - ', Player_Name_W) AS Pair_EW FROM self ORDER BY Board, MP_NS DESC"
 					}
 				]
 			},
@@ -846,7 +846,7 @@
 							{"Contract Predictions Statistics Per Table": "@Contract_Predictions_Statistics_By_Board"},
 							{"Contract Predictions Statistics Per Grouped Contract": "@Contract_Predictions_Statistics_By_Board_By_Contract"}
 						],
-						"sql": "SELECT Board, CASE WHEN Opponent_Pair_Direction='NS' THEN CONCAT(section_name, Pair_Number_NS, ' - ', Player_Name_N, ' - ', Player_Name_S) ELSE CONCAT(section_name, Pair_Number_EW, ' - ', Player_Name_E, ' - ', Player_Name_W) END AS Opponents, Contract, Contract_Pred FROM self WHERE Boards_We_Played = True ORDER BY Board, CONCAT(section_name, Pair_Number_NS)"
+						"sql": "SELECT Board, CASE WHEN Opponent_Pair_Direction='NS' THEN CONCAT(section_name, Pair_Number_NS, '-NS - ', Player_Name_N, ' - ', Player_Name_S) ELSE CONCAT(section_name, Pair_Number_EW, '-EW - ', Player_Name_E, ' - ', Player_Name_W) END AS Opponents, Contract, Contract_Pred FROM self WHERE Boards_We_Played = True ORDER BY Board, CONCAT(section_name, Pair_Number_NS)"
 					}
 				]
 			},
@@ -860,7 +860,7 @@
 							{"Contract Predictions Statistics Per Grouped Contract": "@Contract_Predictions_Statistics_By_Board_By_Contract"},
 							{"Boards Your Partnership Played": "@Boards_We_Played"}
 						],
-						"sql": "SELECT Board, CONCAT(section_name, Pair_Number_NS, ' - ', Player_Name_N, ' vs ', section_name, Pair_Number_EW, ' - ', Player_Name_E) AS NS_vs_EW, Contract, Contract_Pred FROM self ORDER BY Board, CONCAT(section_name, Pair_Number_NS)"
+						"sql": "SELECT Board, CONCAT(section_name, Pair_Number_NS, '-NS - ', Player_Name_N, ' vs ', section_name, Pair_Number_EW, '-EW - ', Player_Name_E) AS NS_vs_EW, Contract, Contract_Pred FROM self ORDER BY Board, CONCAT(section_name, Pair_Number_NS)"
 					}
 				]
 			},
