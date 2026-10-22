@@ -6,7 +6,7 @@ stqdm
 openai
 pandas
 polars
-duckdb
+duckdb>=1.5,<2
 requests
 urllib3
 python-dotenv
