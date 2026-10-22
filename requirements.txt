@@ -5,8 +5,8 @@ streamlit-chat
 stqdm
 openai
 pandas
-polars
-duckdb>=1.5,<2
+polars==1.44.2
+duckdb==1.5.6
 requests
 urllib3
 python-dotenv
