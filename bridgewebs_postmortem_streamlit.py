@@ -105,7 +105,7 @@ def ShowDataFrameTable(df, key, query='SELECT * FROM self', show_sql_query=True)
 
         try:
             con = get_db_connection()
-            result_df = con.execute(query).pl()
+            result_df = con.sql(query).pl()
             if show_sql_query and st.session_state.show_sql_query:
                 st.text(f"Result is a dataframe of {len(result_df)} rows.")
             streamlitlib.ShowDataFrameTable(result_df, key) # requires pandas dataframe.

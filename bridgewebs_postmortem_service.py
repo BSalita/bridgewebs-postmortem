@@ -282,7 +282,7 @@ def run_sql(df: pl.DataFrame, sql: str, meta: Dict[str, Any], limit: Optional[in
     )
     try:
         con.register(CON_REGISTER_NAME, df)
-        result = con.execute(sql).pl()
+        result = con.sql(sql).pl()
     finally:
         con.close()
     truncated = result.height > limit
