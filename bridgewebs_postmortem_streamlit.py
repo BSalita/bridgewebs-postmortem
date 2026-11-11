@@ -69,7 +69,7 @@ for _p in _resolved_libs:
         sys.path.insert(0, _s)
 
 import streamlitlib
-from mlBridge.mlBridgePostmortemLib import PostmortemBase
+from mlBridge.mlBridgePostmortemLib import PostmortemBase, sidebar_report_buttons
 from mlBridge.mlBridgeAugmentLib import (
     AllAugmentations,
 )
@@ -289,6 +289,7 @@ def player_selection_on_change():
         )
         
         st.session_state.df = df_filtered
+        st.session_state.button_title = 'Summarize' # a new game or player opens on the full postmortem
         # Re-register the filtered dataframe for querying
         con = get_db_connection()
         con.register(st.session_state.con_register_name, st.session_state.df)
@@ -432,6 +433,9 @@ def filter_dataframe(df, pair_direction, pair_number, player_direction, player_i
 
 ASSISTANT_LOGO_URL = 'https://github.com/BSalita/Bridge_Game_Postmortem_Chatbot/blob/master/assets/logo_assistant.gif?raw=true' # 🥸 todo: put into config. must have raw=true for github url.
 
+# Sidebar report buttons, keys of favorites['Buttons']. No AI_Predictions: this app makes no predictions.
+REPORT_BUTTONS = ('Summarize', 'Summarize_Briefly', 'Hand_Expectations')
+
 
 def render_sidebar_brand(title: str) -> None:
     """Gif and short title at the top of the sidebar, as in MortyBridgeChatbot."""
@@ -464,7 +468,8 @@ def create_sidebar():
     #default_url = 'GIB-Thorvald-8638-2024-08-23.pbn'
     st.sidebar.text_input('Enter BridgeWebs URL:', default_url, on_change=change_game_state, key='create_sidebar_text_input_url_key', help='Enter a URL or pathless local file name.') # , on_change=change_game_state
     # using css to change button color for the entire button width. The color was choosen to match the the restrictive text colorizer (:green-background[Go]) used in st.info() below.
-    css = """section[data-testid="stSidebar"] div.stButton button {
+    # Only the Go button: the report buttons below keep the default look.
+    css = """section[data-testid="stSidebar"] .st-key-create_sidebar_go_button_key button {
         background-color: rgba(33, 195, 84, 0.1);
         width: 50px;
         }"""
@@ -548,6 +553,9 @@ def create_sidebar():
             'deal_format': 'pbn'
         }
         st.json(params)
+
+    if st.session_state.get('df') is not None and st.session_state.get('favorites'):
+        sidebar_report_buttons(get_db_connection(), REPORT_BUTTONS)
 
     # Other Morty websites
     st.sidebar.markdown("---")
