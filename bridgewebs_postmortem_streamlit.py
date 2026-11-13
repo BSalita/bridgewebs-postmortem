@@ -69,7 +69,7 @@ for _p in _resolved_libs:
         sys.path.insert(0, _s)
 
 import streamlitlib
-from mlBridge.mlBridgePostmortemLib import PostmortemBase, sidebar_report_buttons
+from mlBridge.mlBridgePostmortemLib import PostmortemBase, sidebar_report_buttons, when_connection_free
 from mlBridge.mlBridgeAugmentLib import (
     AllAugmentations,
 )
@@ -105,7 +105,7 @@ def ShowDataFrameTable(df, key, query='SELECT * FROM self', show_sql_query=True)
 
         try:
             con = get_db_connection()
-            result_df = con.sql(query).pl()
+            result_df = when_connection_free(lambda: con.sql(query).pl())
             if show_sql_query and st.session_state.show_sql_query:
                 st.text(f"Result is a dataframe of {len(result_df)} rows.")
             streamlitlib.ShowDataFrameTable(result_df, key) # requires pandas dataframe.
@@ -241,7 +241,7 @@ def player_selection_on_change():
                 
                 # Register DataFrame with DuckDB
                 con = get_db_connection()
-                con.register(st.session_state.con_register_name, df)
+                when_connection_free(lambda: con.register(st.session_state.con_register_name, df))
 
         # --- END OF DEFERRED PROCESSING ---
         
@@ -292,7 +292,7 @@ def player_selection_on_change():
         st.session_state.button_title = 'Summarize' # a new game or player opens on the full postmortem
         # Re-register the filtered dataframe for querying
         con = get_db_connection()
-        con.register(st.session_state.con_register_name, st.session_state.df)
+        when_connection_free(lambda: con.register(st.session_state.con_register_name, st.session_state.df))
 
         # Set ScorePercent based on pair direction
         score_col = f"ScorePercent_{st.session_state.pair_direction}"
